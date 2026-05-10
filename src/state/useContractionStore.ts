@@ -184,6 +184,7 @@ export function useContractionApp() {
       urgentEvents: snapshot.urgentEvents,
       providerRuleResult,
       now,
+      rangeLabel: 'Current session',
       appVersion: '1.0.0',
       includeNotes: true,
       includeUrgentEvents: true,

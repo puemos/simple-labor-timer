@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/domain/timing/dateFormat';
 import { endedEvents, eventDurationSeconds, eventIntervalSeconds, eventRestGapSeconds } from '@/domain/timing/timeMath';
 import { ContractionEvent } from '@/domain/types';
 
@@ -29,8 +30,8 @@ export function buildContractionCsv(events: ContractionEvent[], now: string): st
     ...ended.map((event, index) => {
       const previous = ended[index - 1];
       return [
-        event.startAt,
-        event.endAt,
+        formatDateTime(event.startAt),
+        formatDateTime(event.endAt),
         eventDurationSeconds(event, now),
         eventIntervalSeconds(event, previous),
         eventRestGapSeconds(event, previous),

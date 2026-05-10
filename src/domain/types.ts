@@ -94,7 +94,7 @@ export type AlertEvent = {
 
 export type ShareTarget = 'doula' | 'partner' | 'midwife_ob' | 'hospital_triage' | 'self';
 
-export type ShareFormat = 'plain_text' | 'pdf' | 'csv';
+export type ShareFormat = 'plain_text' | 'pdf';
 
 export type SharePack = {
   id: string;

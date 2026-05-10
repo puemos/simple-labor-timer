@@ -1,14 +1,13 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, Share, Switch, View } from 'react-native';
 import { CONTENT_VERSION } from '@/domain/appConstants';
-import { buildContractionCsv } from '@/domain/export/csvRows';
-import { buildSummaryText, summaryTextToHtml } from '@/domain/export/summaryText';
+import { buildSummaryPdfHtml, buildSummaryText } from '@/domain/export/summaryText';
+import { evaluateProviderRule } from '@/domain/rules/providerRule';
 import { minutesAgo, parseIso, startOfLocalDayIso } from '@/domain/timing/timeMath';
-import { ContractionEvent, ShareFormat, ShareTarget } from '@/domain/types';
+import { ContractionEvent, ContractionSession, ShareFormat, UrgentEvent } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Button,
@@ -34,68 +33,72 @@ const ranges: { key: RangeKey; label: string }[] = [
 ];
 
 const formats: { key: ShareFormat; label: string; color: string }[] = [
-  { key: 'plain_text', label: 'Plain text', color: '#007AFF' },
+  { key: 'plain_text', label: 'Message', color: '#007AFF' },
   { key: 'pdf', label: 'PDF', color: '#FF3B30' },
-  { key: 'csv', label: 'CSV (spreadsheet)', color: '#34C759' },
-];
-
-const targets: { key: ShareTarget; label: string }[] = [
-  { key: 'hospital_triage', label: 'Hospital triage' },
-  { key: 'midwife_ob', label: 'OB / Midwife' },
-  { key: 'doula', label: 'Doula' },
-  { key: 'partner', label: 'Partner' },
-  { key: 'self', label: 'Self' },
 ];
 
 export default function ShareRoute() {
   const { colors, spacing } = useTheme();
-  const { now, providerRuleResult, snapshot } = useContractionApp();
+  const { now, snapshot } = useContractionApp();
   const [range, setRange] = useState<RangeKey>('session');
   const [format, setFormat] = useState<ShareFormat>('plain_text');
-  const [target, setTarget] = useState<ShareTarget>('hospital_triage');
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeUrgent, setIncludeUrgent] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const selectedSession = snapshot?.activeSession ?? snapshot?.latestSession;
+  const exportNow = range === 'session' && selectedSession?.endedAt ? selectedSession.endedAt : now;
 
   const filteredEvents = useMemo(
-    () => filterEvents(snapshot?.events ?? [], range, now, snapshot?.activeSession?.startedAt),
-    [now, range, snapshot?.activeSession?.startedAt, snapshot?.events],
+    () => filterEvents(snapshot?.allEvents ?? [], range, now, selectedSession),
+    [now, range, selectedSession, snapshot?.allEvents],
   );
   const filteredUrgent = useMemo(() => {
-    const start = rangeStartIso(range, now, snapshot?.activeSession?.startedAt);
-    return (snapshot?.urgentEvents ?? []).filter((event) => parseIso(event.occurredAt) >= parseIso(start));
-  }, [now, range, snapshot?.activeSession?.startedAt, snapshot?.urgentEvents]);
+    return filterUrgentEvents(snapshot?.allUrgentEvents ?? [], range, now, selectedSession);
+  }, [now, range, selectedSession, snapshot?.allUrgentEvents]);
+  const exportProviderRuleResult = useMemo(
+    () => evaluateProviderRule(filteredEvents, snapshot?.providerRule, exportNow),
+    [exportNow, filteredEvents, snapshot?.providerRule],
+  );
+  const summarySession = range === 'session' ? selectedSession : undefined;
 
-  const preview = useMemo(() => {
-    if (!snapshot) return '';
-    return buildSummaryText({
+  const summaryInput = useMemo(() => {
+    if (!snapshot) return undefined;
+    return {
       profile: snapshot.profile,
-      session: snapshot.activeSession,
+      session: summarySession,
       events: filteredEvents,
       urgentEvents: filteredUrgent,
-      providerRuleResult,
-      now,
+      providerRuleResult: exportProviderRuleResult,
+      now: exportNow,
+      rangeLabel: formatRangeLabel(range, selectedSession),
       appVersion: '1.0.0',
       includeNotes,
       includeUrgentEvents: includeUrgent,
-    });
-  }, [filteredEvents, filteredUrgent, includeNotes, includeUrgent, now, providerRuleResult, snapshot]);
+    };
+  }, [
+    exportNow,
+    exportProviderRuleResult,
+    filteredEvents,
+    filteredUrgent,
+    includeNotes,
+    includeUrgent,
+    range,
+    selectedSession,
+    snapshot,
+    summarySession,
+  ]);
+  const preview = useMemo(() => (summaryInput ? buildSummaryText(summaryInput) : ''), [summaryInput]);
 
   async function sharePreview() {
-    if (!snapshot) return;
+    if (!summaryInput) return;
     setSharing(true);
     try {
       if (format === 'plain_text') {
         await Share.share({ message: preview });
-      } else if (format === 'pdf') {
-        const { uri } = await Print.printToFileAsync({ html: summaryTextToHtml(preview) });
-        await shareFile(uri, 'application/pdf');
       } else {
-        const csv = buildContractionCsv(filteredEvents, now);
-        const fileUri = `${FileSystem.cacheDirectory}contractions-${Date.now()}.csv`;
-        await FileSystem.writeAsStringAsync(fileUri, csv);
-        await shareFile(fileUri, 'text/csv');
+        const { uri } = await Print.printToFileAsync({ html: buildSummaryPdfHtml(summaryInput) });
+        await shareFile(uri, 'application/pdf');
       }
     } catch (error) {
       Alert.alert('Share failed', error instanceof Error ? error.message : 'The share sheet could not be opened.');
@@ -121,7 +124,7 @@ export default function ShareRoute() {
     );
   }
 
-  const formatIcon = format === 'csv' ? Icons.FileSpreadsheet : format === 'pdf' ? Icons.FileText : Icons.Send;
+  const formatIcon = format === 'pdf' ? Icons.FileText : Icons.Send;
 
   return (
     <Sheet>
@@ -143,7 +146,7 @@ export default function ShareRoute() {
               key={option.key}
               title={option.label}
               leading={{
-                icon: option.key === 'csv' ? Icons.FileSpreadsheet : option.key === 'pdf' ? Icons.FileText : Icons.Send,
+                icon: option.key === 'pdf' ? Icons.FileText : Icons.Send,
                 color: option.color,
               }}
               trailing="check"
@@ -151,15 +154,6 @@ export default function ShareRoute() {
               onPress={() => setFormat(option.key)}
             />
           ))}
-        </ListSection>
-
-        <ListSection header="Recipient">
-          <ListRow
-            title="Recipient"
-            value={targets.find((item) => item.key === target)?.label}
-            trailing="value"
-            onPress={() => promptTarget(target, setTarget)}
-          />
         </ListSection>
 
         <ListSection header="Privacy" footer="Files are generated locally. No upload, account, or share link is created.">
@@ -198,7 +192,7 @@ export default function ShareRoute() {
             <ScrollView
               style={{ maxHeight: 220, paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}
             >
-              <Footnote style={{ fontFamily: 'Courier' }}>{format === 'csv' ? buildContractionCsv(filteredEvents, now) : preview}</Footnote>
+              <Footnote style={{ fontFamily: 'Courier' }}>{preview}</Footnote>
             </ScrollView>
           ) : null}
         </ListSection>
@@ -222,20 +216,31 @@ export default function ShareRoute() {
   );
 }
 
-function rangeStartIso(range: RangeKey, now: string, sessionStart?: string): string {
+function rangeStartIso(range: RangeKey, now: string): string {
   switch (range) {
     case 'today':
       return startOfLocalDayIso(new Date(now));
     case 'last24':
       return minutesAgo(24 * 60, now);
     case 'session':
-      return sessionStart ?? minutesAgo(24 * 60, now);
+      return minutesAgo(24 * 60, now);
   }
 }
 
-function filterEvents(events: ContractionEvent[], range: RangeKey, now: string, sessionStart?: string): ContractionEvent[] {
-  const start = rangeStartIso(range, now, sessionStart);
+function filterEvents(events: ContractionEvent[], range: RangeKey, now: string, session?: ContractionSession): ContractionEvent[] {
+  if (range === 'session') {
+    return session ? events.filter((event) => event.sessionId === session.id) : [];
+  }
+  const start = rangeStartIso(range, now);
   return events.filter((event) => parseIso(event.startAt) >= parseIso(start));
+}
+
+function filterUrgentEvents(events: UrgentEvent[], range: RangeKey, now: string, session?: ContractionSession): UrgentEvent[] {
+  if (range === 'session') {
+    return session ? events.filter((event) => event.sessionId === session.id) : [];
+  }
+  const start = rangeStartIso(range, now);
+  return events.filter((event) => parseIso(event.occurredAt) >= parseIso(start));
 }
 
 async function shareFile(uri: string, mimeType: string) {
@@ -247,19 +252,19 @@ async function shareFile(uri: string, mimeType: string) {
 }
 
 function formatLabel(format: ShareFormat): string {
-  return format === 'plain_text' ? 'text' : format.toUpperCase();
+  return format === 'plain_text' ? 'message' : format.toUpperCase();
 }
 
-function promptTarget(current: ShareTarget, setTarget: (value: ShareTarget) => void) {
-  Alert.alert(
-    'Recipient',
-    'Who is this for?',
-    [
-      ...targets.map((option) => ({
-        text: `${option.label}${current === option.key ? ' ✓' : ''}`,
-        onPress: () => setTarget(option.key),
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ],
-  );
+function formatRangeLabel(range: RangeKey, session?: ContractionSession): string {
+  switch (range) {
+    case 'today':
+      return 'Today';
+    case 'last24':
+      return 'Last 24 hours';
+    case 'session':
+      if (!session) {
+        return 'Session';
+      }
+      return session.status === 'active' ? 'Current session' : 'Latest session';
+  }
 }
