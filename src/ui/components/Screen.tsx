@@ -60,6 +60,7 @@ export function Screen({
 
   const Header = (
     <View
+      collapsable={false}
       style={[
         styles.headerBar,
         {

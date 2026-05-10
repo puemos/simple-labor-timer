@@ -1,108 +1,52 @@
 import { router } from 'expo-router';
 import * as KeepAwake from 'expo-keep-awake';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   FadeIn,
   FadeOut,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { hapticEnd } from '@/native/haptics';
-import { buildRhythmSummary, defaultRhythmSelectedEventId } from '@/domain/timing/rhythm';
-import { formatDuration, formatShortDuration } from '@/domain/timing/timeMath';
-import { ContractionEvent, Intensity } from '@/domain/types';
+import { hapticEnd, hapticSelection } from '@/native/haptics';
+import { formatTimeOnly } from '@/domain/timing/dateFormat';
+import { buildRhythmSummary, rhythmStatusText } from '@/domain/timing/rhythm';
+import {
+  eventDurationSeconds,
+  eventRestGapSeconds,
+  formatDuration,
+  formatShortDuration,
+  secondsBetween,
+  visibleEvents,
+} from '@/domain/timing/timeMath';
+import { ContractionEvent } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Body,
   Button,
+  Card,
   Footnote,
   Headline,
   IconButton,
   MetricTile,
-  RhythmSummaryRow,
   Screen,
-  SegmentedControl,
   Subhead,
-  TextField,
 } from '@/ui/components';
-import { Icons } from '@/ui/icons';
+import { Icons, ICON_STROKE_WIDTH } from '@/ui/icons';
 import { useTheme } from '@/ui/theme';
-
-const intensityOptions: { key: Intensity; label: string }[] = [
-  { key: 'mild', label: 'Mild' },
-  { key: 'moderate', label: 'Moderate' },
-  { key: 'strong', label: 'Strong' },
-  { key: 'cannot_talk_walk', label: "Can't talk" },
-];
-
-const REVIEW_SHEET_AUTO_CLOSE_MS = 6000;
 
 export default function TimerRoute() {
   const { colors, scheme, spacing, radii, shadows, typography } = useTheme();
   const { actions, busy, error, loading, now, providerRuleResult, snapshot, summary, urgentRuleResult } = useContractionApp();
-  const [note, setNote] = useState('');
-  const [reviewEventId, setReviewEventId] = useState<string>();
-  const [reviewInteracted, setReviewInteracted] = useState(false);
+  const insets = useSafeAreaInsets();
   const previousRuleMet = useRef(false);
-  const wasMeasuring = useRef(false);
   const measuring = summary.timerState === 'measuring';
   const resting = summary.timerState === 'resting';
-  const lastEvent = summary.lastEvent;
-  const reviewEvent = resting && lastEvent?.id === reviewEventId ? lastEvent : undefined;
-
-  const breath = useSharedValue(1);
-
-  useEffect(() => {
-    if (measuring) {
-      breath.value = withRepeat(
-        withTiming(1.015, { duration: 4000, easing: Easing.inOut(Easing.quad) }),
-        -1,
-        true,
-      );
-    } else {
-      breath.value = withTiming(1, { duration: 220 });
-    }
-  }, [measuring, breath]);
-
-  const breathStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: breath.value }],
-  }));
-
-  useEffect(() => {
-    setNote(lastEvent?.note ?? '');
-  }, [lastEvent?.id, lastEvent?.note]);
-
-  useEffect(() => {
-    if (wasMeasuring.current && resting && lastEvent) {
-      setNote(lastEvent.note ?? '');
-      setReviewEventId(lastEvent.id);
-      setReviewInteracted(false);
-    }
-    wasMeasuring.current = measuring;
-  }, [lastEvent, measuring, resting]);
-
-  const reviewEventIdToSave = reviewEvent?.id;
-  const dismissReview = useCallback(() => {
-    if (reviewEventIdToSave) {
-      void actions.updateEvent(reviewEventIdToSave, { note });
-    }
-    setReviewEventId(undefined);
-    setReviewInteracted(false);
-  }, [actions, note, reviewEventIdToSave]);
-
-  useEffect(() => {
-    if (!reviewEventIdToSave || reviewInteracted) {
-      return;
-    }
-
-    const timeout = setTimeout(dismissReview, REVIEW_SHEET_AUTO_CLOSE_MS);
-    return () => clearTimeout(timeout);
-  }, [dismissReview, reviewEventIdToSave, reviewInteracted]);
+  const currentSessionEvents = useMemo(() => visibleEvents(snapshot?.events ?? []), [snapshot?.events]);
 
   useEffect(() => {
     if (!measuring) {
@@ -127,7 +71,6 @@ export default function TimerRoute() {
       return;
     }
 
-    dismissReview();
     void actions.start();
   }
 
@@ -157,26 +100,25 @@ export default function TimerRoute() {
   const urgentActive = urgentRuleResult.active;
   const stateLabel = measuring ? 'Now timing' : resting ? 'Resting' : 'Idle';
   const timerActionLabel = measuring ? 'End contraction' : 'Start contraction';
-  const badgeBg = measuring ? colors.urgent : colors.systemFill;
-  const badgeColor = measuring ? colors.onUrgent : colors.label;
+  const badgeBg = measuring ? colors.contractionActive : colors.systemFill;
+  const badgeColor = measuring ? colors.onContractionActive : colors.label;
   const heroBackground = measuring
-    ? scheme === 'dark'
-      ? 'rgba(255, 69, 58, 0.18)'
-      : 'rgba(255, 59, 48, 0.08)'
+    ? colors.contractionActiveSubtle
     : scheme === 'dark'
       ? 'rgba(10, 132, 255, 0.16)'
       : 'rgba(0, 122, 255, 0.06)';
-  const heroBorderColor = measuring ? colors.urgent : colors.accent;
-  const actionBackground = measuring ? colors.urgent : colors.accent;
-  const actionLabelColor = measuring ? colors.onUrgent : colors.onAccent;
+  const heroBorderColor = measuring ? colors.contractionActive : colors.accent;
+  const actionBackground = measuring ? colors.contractionActive : colors.accent;
+  const actionLabelColor = measuring ? colors.onContractionActive : colors.onAccent;
   const timerSeconds = measuring
     ? formatActiveDuration(summary.activeEvent?.startAt, now)
     : resting
       ? (summary.currentRestSeconds ?? 0)
       : 0;
   const timerLabel = formatDuration(timerSeconds);
-  const rhythmRangeStartAt = snapshot.activeSession?.startedAt ?? snapshot.events[0]?.startAt;
-  const rhythmSummary = buildRhythmSummary(snapshot.events, now, { rangeStartAt: rhythmRangeStartAt, rangeEndAt: now });
+  const rhythmRangeStartAt = snapshot.activeSession?.startedAt ?? currentSessionEvents[0]?.startAt;
+  const rhythmSummary = buildRhythmSummary(currentSessionEvents, now, { rangeStartAt: rhythmRangeStartAt, rangeEndAt: now });
+  const rhythmStatus = rhythmStatusText(rhythmSummary.pattern);
 
   return (
     <Screen
@@ -197,9 +139,33 @@ export default function TimerRoute() {
           <IconButton icon={Icons.History} label="History" onPress={() => router.push('/history')} />
         </View>
       }
-      headerRight={<IconButton icon={Icons.Settings} label="Settings" onPress={() => router.push('/settings')} />}
+      headerRight={
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {resting ? (
+            <IconButton
+              icon={Icons.Flag}
+              label="Finish session"
+              tone="neutral"
+              onPress={actions.closeSession}
+              disabled={busy}
+            />
+          ) : null}
+          <IconButton icon={Icons.Settings} label="Settings" onPress={() => router.push('/settings')} />
+        </View>
+      }
+      scrollable
+      contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, spacing.base) }}
     >
-      <View style={[styles.container, { paddingHorizontal: spacing.base, gap: spacing.base }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingHorizontal: spacing.base,
+            paddingTop: spacing.sm,
+            gap: spacing.base,
+          },
+        ]}
+      >
         {urgentActive ? (
           <Animated.View entering={FadeIn.springify().damping(18).stiffness(180)} exiting={FadeOut.duration(160)}>
             <Pressable
@@ -241,7 +207,7 @@ export default function TimerRoute() {
             },
           ]}
         >
-          <Animated.View
+          <View
             style={[
               styles.hero,
               {
@@ -250,7 +216,6 @@ export default function TimerRoute() {
                 borderRadius: 42,
                 ...shadows.card,
               },
-              breathStyle,
             ]}
           >
             <View
@@ -296,85 +261,267 @@ export default function TimerRoute() {
               ]}
             >
               {busy ? <ActivityIndicator color={actionLabelColor} /> : null}
-              <Headline color={measuring ? 'onUrgent' : 'onAccent'} numberOfLines={1} style={styles.heroActionLabel}>
+              <Headline numberOfLines={1} style={[styles.heroActionLabel, { color: actionLabelColor }]}>
                 {timerActionLabel}
               </Headline>
             </View>
-          </Animated.View>
+          </View>
         </Pressable>
 
         <View style={[styles.metrics, { gap: spacing.sm }]}>
-          <MetricTile label="Last duration" value={formatShortDuration(summary.lastDurationSeconds)} />
-          <MetricTile label="Last interval" value={formatShortDuration(summary.lastIntervalSeconds)} />
-          <MetricTile
-            label="Avg last 5"
-            value={formatShortDuration(summary.averageIntervalLast5Seconds)}
-            accent={providerRuleResult.met}
-          />
+          <MetricTile label="Duration" value={formatShortDuration(summary.lastDurationSeconds)} icon={Icons.Timer} />
+          <MetricTile label="Interval" value={formatShortDuration(summary.lastIntervalSeconds)} icon={Icons.Clock} />
         </View>
 
-        {rhythmSummary.eventCount > 0 ? (
-          <RhythmSummaryRow
-            summary={rhythmSummary}
-            disabled={rhythmSummary.eventCount < 2}
-            sourceLabel="Current session"
-            onPress={() =>
-              router.push({
-                pathname: '/rhythm',
-                params: { selectedEventId: defaultRhythmSelectedEventId(rhythmSummary) },
-              })
-            }
-          />
+        <RhythmStatusControl
+          status={rhythmStatus}
+          accent={providerRuleResult.met}
+          disabled={rhythmSummary.eventCount < 2}
+          onPress={() => router.push('/rhythm')}
+        />
+
+        {currentSessionEvents.length > 0 ? (
+          <CurrentSessionTimeline events={currentSessionEvents} now={now} />
         ) : null}
 
-        <View style={{ gap: spacing.xs, marginTop: 'auto', paddingTop: spacing.md }}>
-          {resting ? (
-            <Button
-              variant="gray"
-              size="sm"
-              label="Finish session"
-              leadingIcon={Icons.Flag}
-              onPress={actions.closeSession}
-              disabled={busy}
-              fullWidth
-            />
-          ) : null}
-          {resting && snapshot.events.length > 0 ? (
-            <Button
-              variant="plain"
-              size="sm"
-              label="Undo last"
-              leadingIcon={Icons.Undo2}
-              onPress={actions.undo}
-              disabled={busy}
-              fullWidth
-            />
-          ) : null}
-        </View>
-
-        <ContractionReviewSheet
-          event={reviewEvent}
-          note={note}
-          onClose={dismissReview}
-          onInteraction={() => setReviewInteracted(true)}
-          onIntensityChange={(intensity) => {
-            setReviewInteracted(true);
-            if (reviewEvent) {
-              void actions.updateEvent(reviewEvent.id, { intensity });
-            }
-          }}
-          onNoteBlur={() => {
-            if (reviewEvent) {
-              void actions.updateEvent(reviewEvent.id, { note });
-            }
-          }}
-          onNoteChange={(value) => {
-            setReviewInteracted(true);
-            setNote(value);
-          }}
-        />
+        {currentSessionEvents.length > 0 ? (
+          <Button
+            variant="plain"
+            size="sm"
+            label="Undo last"
+            leadingIcon={Icons.Undo2}
+            onPress={actions.undo}
+            disabled={busy}
+            fullWidth
+          />
+        ) : null}
       </View>
     </Screen>
+  );
+}
+
+function RhythmStatusControl({
+  status,
+  accent,
+  disabled,
+  onPress,
+}: {
+  status: string;
+  accent?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const { colors, radii, spacing } = useTheme();
+  const isDisabled = Boolean(disabled);
+
+  const content = (
+    <Card accent={accent} padding={spacing.md} style={isDisabled ? styles.disabledControl : undefined}>
+      <View style={styles.rhythmControlRow}>
+        <View
+          style={[
+            styles.rhythmIconFrame,
+            {
+              backgroundColor: colors.tertiarySystemFill,
+              borderRadius: radii.md,
+            },
+          ]}
+        >
+          <Icons.Waves color={colors.accent} size={19} strokeWidth={ICON_STROKE_WIDTH} />
+        </View>
+        <View style={styles.rhythmControlBody}>
+          <Footnote color="secondary" numberOfLines={1}>
+            Rhythm
+          </Footnote>
+          <Headline numberOfLines={1} style={styles.rhythmStatus}>
+            {status}
+          </Headline>
+        </View>
+        {isDisabled ? null : <Icons.ChevronRight color={colors.tertiaryLabel} size={19} strokeWidth={ICON_STROKE_WIDTH} />}
+      </View>
+    </Card>
+  );
+
+  if (isDisabled) {
+    return content;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Rhythm, ${status}`}
+      accessibilityHint="Opens rhythm details"
+      onPress={() => {
+        void hapticSelection();
+        onPress();
+      }}
+      style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
+function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; now: string }) {
+  const { colors, radii, spacing } = useTheme();
+  const totalSessionSeconds = events.length > 0 ? secondsBetween(events[0].startAt, now) : 0;
+  const isLatestActive = Boolean(events.at(-1) && !events.at(-1)!.endAt);
+  const ordered = useMemo(() => [...events].reverse(), [events]);
+
+  return (
+    <Animated.View
+      layout={LinearTransition.duration(220)}
+      style={[
+        styles.timelinePanel,
+        {
+          backgroundColor: colors.secondarySystemBackground,
+          borderRadius: radii.xl,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.timelineSectionHeader,
+          {
+            borderBottomColor: colors.separator,
+            paddingHorizontal: spacing.base,
+            paddingVertical: spacing.md,
+          },
+        ]}
+      >
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Headline numberOfLines={1}>Current session</Headline>
+          <Footnote color="secondary" numberOfLines={1} style={styles.timelineHeaderMeta}>
+            {events.length} {events.length === 1 ? 'contraction' : 'contractions'} · {formatShortDuration(totalSessionSeconds)}
+          </Footnote>
+        </View>
+        {isLatestActive ? (
+          <View
+            style={[
+              styles.timelineHeaderBadge,
+              {
+                backgroundColor: colors.contractionActive,
+                borderRadius: radii.pill,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: 2,
+              },
+            ]}
+          >
+            <Footnote style={[styles.timelineHeaderBadgeLabel, { color: colors.onContractionActive }]}>
+              LIVE
+            </Footnote>
+          </View>
+        ) : null}
+      </View>
+      {ordered.map((event, displayIndex) => {
+        const chronoIndex = events.length - 1 - displayIndex;
+        const prevChrono = events[chronoIndex - 1];
+        const restGap = prevChrono ? eventRestGapSeconds(event, prevChrono) : undefined;
+        const isActive = !event.endAt;
+        const isTop = displayIndex === 0;
+        const dotColor = isActive ? colors.contractionActive : colors.accent;
+
+        return (
+          <Animated.View
+            key={event.id}
+            entering={FadeIn.duration(200)}
+            layout={LinearTransition.duration(220)}
+          >
+            <View
+              style={[
+                styles.timelineContractionRow,
+                {
+                  borderTopWidth: isTop ? 0 : StyleSheet.hairlineWidth,
+                  borderTopColor: colors.separator,
+                  paddingHorizontal: spacing.base,
+                  paddingVertical: spacing.md,
+                },
+              ]}
+            >
+              <View style={styles.timelineLeading}>
+                <PulseDot active={isActive} color={dotColor} />
+              </View>
+              <View style={styles.timelineBody}>
+                <View style={styles.timelineTitleRow}>
+                  <Headline numberOfLines={1} style={{ flex: 1 }}>
+                    Contraction {chronoIndex + 1}
+                  </Headline>
+                  <Footnote
+                    numberOfLines={1}
+                    style={[styles.timelineDuration, isActive && { color: colors.contractionActive }]}
+                  >
+                    {formatShortDuration(eventDurationSeconds(event, now))}
+                  </Footnote>
+                </View>
+                <Footnote color="tertiary" numberOfLines={1} style={styles.timelineSubtitle}>
+                  {formatTimeOnly(event.startAt)} – {event.endAt ? formatTimeOnly(event.endAt) : 'now'}
+                </Footnote>
+              </View>
+            </View>
+            {restGap !== undefined ? (
+              <View
+                style={[
+                  styles.timelineRestRow,
+                  {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: colors.separator,
+                    paddingHorizontal: spacing.base,
+                    paddingVertical: spacing.sm,
+                  },
+                ]}
+              >
+                <View style={styles.timelineLeading}>
+                  <View style={[styles.timelineRestLine, { backgroundColor: colors.separator }]} />
+                </View>
+                <View style={styles.timelineRestBody}>
+                  <Footnote color="secondary" style={styles.timelineRestLabel}>
+                    Rest
+                  </Footnote>
+                  <Footnote color="secondary" style={styles.timelineRestDuration}>
+                    {formatShortDuration(restGap)}
+                  </Footnote>
+                </View>
+              </View>
+            ) : null}
+          </Animated.View>
+        );
+      })}
+    </Animated.View>
+  );
+}
+
+function PulseDot({ active, color }: { active: boolean; color: string }) {
+  const scale = useSharedValue(1);
+  const halo = useSharedValue(0);
+
+  useEffect(() => {
+    if (active) {
+      scale.value = withRepeat(withTiming(1.18, { duration: 800 }), -1, true);
+      halo.value = withRepeat(withTiming(1, { duration: 1200 }), -1, false);
+    } else {
+      scale.value = withTiming(1, { duration: 220 });
+      halo.value = withTiming(0, { duration: 160 });
+    }
+  }, [active, scale, halo]);
+
+  const dotStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.35 * (1 - halo.value),
+    transform: [{ scale: 1 + halo.value * 1.6 }],
+  }));
+
+  return (
+    <View style={styles.timelineDotWrap}>
+      {active ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.timelineDotHalo, { backgroundColor: color }, haloStyle]}
+        />
+      ) : null}
+      <Animated.View style={[styles.timelineDot, { backgroundColor: color }, dotStyle]} />
+    </View>
   );
 }
 
@@ -393,91 +540,6 @@ function callNumber(phone?: string) {
   void Linking.openURL(`tel:${phone.replace(/[^\d+]/g, '')}`);
 }
 
-type ContractionReviewSheetProps = {
-  event?: ContractionEvent;
-  note: string;
-  onClose: () => void;
-  onInteraction: () => void;
-  onIntensityChange: (intensity: Intensity) => void;
-  onNoteBlur: () => void;
-  onNoteChange: (value: string) => void;
-};
-
-function ContractionReviewSheet({
-  event,
-  note,
-  onClose,
-  onInteraction,
-  onIntensityChange,
-  onNoteBlur,
-  onNoteChange,
-}: ContractionReviewSheetProps) {
-  const { colors, radii, spacing } = useTheme();
-  const insets = useSafeAreaInsets();
-  const [noteFocused, setNoteFocused] = useState(false);
-  const bottomClearance = Math.max(insets.bottom + spacing.lg, spacing.xxxxl);
-
-  useEffect(() => {
-    if (!event) {
-      setNoteFocused(false);
-    }
-  }, [event]);
-
-  return (
-    <Modal transparent visible={Boolean(event)} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close contraction review" style={styles.backdrop} onPress={onClose} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          pointerEvents="box-none"
-          style={styles.sheetHost}
-        >
-          <View
-            style={[
-              styles.reviewSheet,
-              {
-                backgroundColor: colors.secondarySystemBackground,
-                borderTopLeftRadius: radii.xxl,
-                borderTopRightRadius: radii.xxl,
-                paddingHorizontal: spacing.base,
-                paddingTop: spacing.md,
-                paddingBottom: bottomClearance,
-                gap: spacing.sm,
-                marginBottom: noteFocused ? spacing.xxl : 0,
-              },
-            ]}
-          >
-            <View style={[styles.grabber, { backgroundColor: colors.tertiaryLabel, marginBottom: spacing.xs }]} />
-            <View style={styles.sheetHeader}>
-              <Headline>Last contraction</Headline>
-              <Button variant="plain" size="sm" label="Done" onPress={onClose} />
-            </View>
-            <SegmentedControl
-              options={intensityOptions}
-              value={(event?.intensity ?? 'mild') as Intensity}
-              onChange={onIntensityChange}
-            />
-            <TextField
-              accessibilityLabel="Last contraction note"
-              value={note}
-              onBlur={() => {
-                setNoteFocused(false);
-                onNoteBlur();
-              }}
-              onChangeText={onNoteChange}
-              onFocus={() => {
-                setNoteFocused(true);
-                onInteraction();
-              }}
-              placeholder="Add a note"
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -488,19 +550,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroPressable: {
-    flexBasis: 340,
-    flexGrow: 1,
-    flexShrink: 1,
     justifyContent: 'center',
-    maxHeight: 430,
-    minHeight: 280,
+    minHeight: 320,
   },
   hero: {
-    flex: 1,
     alignItems: 'center',
     borderWidth: 1.5,
     justifyContent: 'center',
-    minHeight: 280,
+    minHeight: 320,
     paddingHorizontal: 24,
     paddingVertical: 32,
   },
@@ -520,31 +577,119 @@ const styles = StyleSheet.create({
   metrics: {
     flexDirection: 'row',
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+  disabledControl: {
+    opacity: 0.62,
   },
-  grabber: {
-    alignSelf: 'center',
-    borderRadius: 2,
-    height: 4,
-    width: 36,
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  reviewSheet: {
-    alignSelf: 'stretch',
-    maxHeight: '70%',
-  },
-  sheetHeader: {
+  rhythmControlRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
   },
-  sheetHost: {
+  rhythmIconFrame: {
+    alignItems: 'center',
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  rhythmControlBody: {
     flex: 1,
-    justifyContent: 'flex-end',
+    minWidth: 0,
+  },
+  rhythmStatus: {
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  timelinePanel: {
+    overflow: 'hidden',
+  },
+  timelineSectionHeader: {
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timelineHeaderMeta: {
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  timelineHeaderBadge: {
+    alignItems: 'center',
+    flexShrink: 0,
+    justifyContent: 'center',
+  },
+  timelineHeaderBadgeLabel: {
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  timelineContractionRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 14,
+  },
+  timelineRestRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+  },
+  timelineLeading: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    width: 22,
+  },
+  timelineRestLine: {
+    height: 14,
+    width: 1,
+  },
+  timelineRestBody: {
+    alignItems: 'baseline',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timelineRestLabel: {
+    flex: 1,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+  },
+  timelineRestDuration: {
+    flexShrink: 0,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '500',
+  },
+  timelineDotWrap: {
+    alignItems: 'center',
+    height: 18,
+    justifyContent: 'center',
+    width: 18,
+  },
+  timelineDot: {
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  timelineDotHalo: {
+    borderRadius: 9,
+    height: 18,
+    position: 'absolute',
+    width: 18,
+  },
+  timelineBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  timelineTitleRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timelineDuration: {
+    flexShrink: 0,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+  },
+  timelineSubtitle: {
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
   },
 });
