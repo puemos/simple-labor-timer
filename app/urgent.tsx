@@ -66,30 +66,80 @@ export default function UrgentRoute() {
 
   return (
     <Sheet>
-      <View style={{ flex: 1, backgroundColor: colors.systemGroupedBackground }}>
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.urgent,
-            opacity: 0.06,
-          }}
-        />
-        <Screen
-          scrollable
-          background="grouped"
-          largeTitle="Urgent"
-          headerLeft={<IconButton icon={Icons.X} label="Close" onPress={() => router.back()} />}
-        >
-          <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.base }}>
-            {urgentRuleResult.active ? (
+      <Screen
+        scrollable
+        background="grouped"
+        largeTitle="Urgent"
+        headerLeft={<IconButton icon={Icons.X} label="Close" onPress={() => router.back()} />}
+      >
+        <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.base }}>
+          {urgentRuleResult.active ? (
+            <View
+              style={{
+                backgroundColor: colors.urgent,
+                borderRadius: radii.lg,
+                padding: spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.sm,
+              }}
+            >
+              <Icons.AlertTriangle color={colors.onUrgent} size={20} strokeWidth={2} />
+              <Headline color="onUrgent" style={{ flex: 1 }}>
+                {urgentRuleResult.message}
+              </Headline>
+            </View>
+          ) : (
+            <Subhead color="secondary">
+              Use this screen for warning signs that override timing — call your care team and record the event below.
+            </Subhead>
+          )}
+        </View>
+
+        <ListSection header="Contact">
+          {phones
+            .filter((phone) => phone.value)
+            .map((phone) => (
+              <View key={phone.label} style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.xs }}>
+                <Button
+                  variant={phone.emergency ? 'destructive' : 'filled'}
+                  size="lg"
+                  leadingIcon={Icons.Phone}
+                  label={phone.label}
+                  onPress={() => void Linking.openURL(`tel:${phone.value!.replace(/[^\d+]/g, '')}`)}
+                  fullWidth
+                />
+              </View>
+            ))}
+          {phones.every((phone) => !phone.value) ? (
+            <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
+              <Body color="secondary" style={{ marginBottom: spacing.sm }}>
+                No contacts saved yet.
+              </Body>
+              <Button variant="tinted" label="Add contacts" onPress={() => router.push('/settings')} fullWidth />
+            </View>
+          ) : null}
+        </ListSection>
+
+        <ListSection header="Record warning sign" footer="Tapping a row records the event immediately.">
+          {urgentItems.map((item) => (
+            <ListRow
+              key={item.type}
+              title={item.label}
+              leading={{ icon: item.icon, color: item.color }}
+              trailing="chevron"
+              onPress={() => record(item.type)}
+              disabled={busy}
+            />
+          ))}
+        </ListSection>
+
+        {recordedFlash ? (
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
+            <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.base }}>
               <View
                 style={{
-                  backgroundColor: colors.urgent,
+                  backgroundColor: colors.secondarySystemBackground,
                   borderRadius: radii.lg,
                   padding: spacing.md,
                   flexDirection: 'row',
@@ -97,102 +147,38 @@ export default function UrgentRoute() {
                   gap: spacing.sm,
                 }}
               >
-                <Icons.AlertTriangle color={colors.onUrgent} size={20} strokeWidth={2} />
-                <Headline color="onUrgent" style={{ flex: 1 }}>
-                  {urgentRuleResult.message}
-                </Headline>
+                <Icons.Check color={colors.success} size={20} strokeWidth={2.4} />
+                <Body style={{ flex: 1 }}>Recorded {urgentTypeLabels[recordedFlash.type]}.</Body>
+                <Button variant="plain" size="sm" label="Undo" onPress={undoLast} />
               </View>
-            ) : (
-              <Subhead color="secondary">
-                Use this screen for warning signs that override timing — call your care team and record the event below.
-              </Subhead>
-            )}
-          </View>
+            </View>
+          </Animated.View>
+        ) : null}
 
-          <ListSection header="Contact">
-            {phones
-              .filter((phone) => phone.value)
-              .map((phone) => (
-                <View key={phone.label} style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.xs }}>
-                  <Button
-                    variant={phone.emergency ? 'destructive' : 'filled'}
-                    size="lg"
-                    leadingIcon={Icons.Phone}
-                    label={phone.label}
-                    onPress={() => void Linking.openURL(`tel:${phone.value!.replace(/[^\d+]/g, '')}`)}
-                    fullWidth
-                  />
-                </View>
-              ))}
-            {phones.every((phone) => !phone.value) ? (
-              <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
-                <Body color="secondary" style={{ marginBottom: spacing.sm }}>
-                  No contacts saved yet.
-                </Body>
-                <Button variant="tinted" label="Add contacts" onPress={() => router.push('/settings')} fullWidth />
-              </View>
-            ) : null}
-          </ListSection>
-
-          <ListSection header="Record warning sign" footer="Tapping a row records the event immediately.">
-            {urgentItems.map((item) => (
+        <ListSection header="Recorded in this session">
+          {snapshot?.urgentEvents.length ? (
+            snapshot.urgentEvents.map((event) => (
               <ListRow
-                key={item.type}
-                title={item.label}
-                leading={{ icon: item.icon, color: item.color }}
-                trailing="chevron"
-                onPress={() => record(item.type)}
-                disabled={busy}
+                key={event.id}
+                title={urgentTypeLabels[event.type]}
+                subtitle={event.note}
+                trailing="value"
+                value={formatTimeOnly(event.occurredAt)}
               />
-            ))}
-          </ListSection>
+            ))
+          ) : (
+            <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
+              <Footnote color="secondary">No urgent events recorded.</Footnote>
+            </View>
+          )}
+        </ListSection>
 
-          {recordedFlash ? (
-            <Animated.View entering={FadeIn} exiting={FadeOut}>
-              <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.base }}>
-                <View
-                  style={{
-                    backgroundColor: colors.secondarySystemBackground,
-                    borderRadius: radii.lg,
-                    padding: spacing.md,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: spacing.sm,
-                  }}
-                >
-                  <Icons.Check color={colors.success} size={20} strokeWidth={2.4} />
-                  <Body style={{ flex: 1 }}>Recorded {urgentTypeLabels[recordedFlash.type]}.</Body>
-                  <Button variant="plain" size="sm" label="Undo" onPress={undoLast} />
-                </View>
-              </View>
-            </Animated.View>
-          ) : null}
-
-          <ListSection header="Recorded in this session">
-            {snapshot?.urgentEvents.length ? (
-              snapshot.urgentEvents.map((event) => (
-                <ListRow
-                  key={event.id}
-                  title={urgentTypeLabels[event.type]}
-                  subtitle={event.note}
-                  trailing="value"
-                  value={formatTimeOnly(event.occurredAt)}
-                />
-              ))
-            ) : (
-              <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
-                <Footnote color="secondary">No urgent events recorded.</Footnote>
-              </View>
-            )}
-          </ListSection>
-
-          <View style={{ height: spacing.lg }} />
-          {/* Cap the bottom with a tiny version note */}
-          <Caption1 color="tertiary" style={{ textAlign: 'center', marginBottom: spacing.lg }}>
-            Recording an urgent event keeps timing data intact.
-          </Caption1>
-        </Screen>
-      </View>
+        <View style={{ height: spacing.lg }} />
+        {/* Cap the bottom with a tiny version note */}
+        <Caption1 color="tertiary" style={{ textAlign: 'center', marginBottom: spacing.lg }}>
+          Recording an urgent event keeps timing data intact.
+        </Caption1>
+      </Screen>
     </Sheet>
   );
 }
