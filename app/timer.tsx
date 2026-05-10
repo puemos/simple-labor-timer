@@ -442,9 +442,14 @@ function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; n
               </View>
               <View style={styles.timelineBody}>
                 <View style={styles.timelineTitleRow}>
-                  <Headline numberOfLines={1} style={{ flex: 1 }}>
-                    Contraction {chronoIndex + 1}
-                  </Headline>
+                  <View style={styles.timelineTitleMeta}>
+                    <Subhead numberOfLines={1} style={styles.timelineContractionTitle}>
+                      #{chronoIndex + 1}
+                    </Subhead>
+                    <Footnote color="tertiary" numberOfLines={1} style={styles.timelineInlineTime}>
+                      {formatTimeOnly(event.startAt)} – {event.endAt ? formatTimeOnly(event.endAt) : 'now'}
+                    </Footnote>
+                  </View>
                   <Footnote
                     numberOfLines={1}
                     style={[styles.timelineDuration, isActive && { color: colors.contractionActive }]}
@@ -452,9 +457,6 @@ function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; n
                     {formatShortDuration(eventDurationSeconds(event, now))}
                   </Footnote>
                 </View>
-                <Footnote color="tertiary" numberOfLines={1} style={styles.timelineSubtitle}>
-                  {formatTimeOnly(event.startAt)} – {event.endAt ? formatTimeOnly(event.endAt) : 'now'}
-                </Footnote>
               </View>
             </View>
             {restGap !== undefined ? (
@@ -683,13 +685,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  timelineTitleMeta: {
+    alignItems: 'baseline',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 0,
+  },
+  timelineContractionTitle: {
+    flexShrink: 0,
+    fontWeight: '700',
+    letterSpacing: 0,
+  },
+  timelineInlineTime: {
+    flexShrink: 1,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0,
+  },
   timelineDuration: {
     flexShrink: 0,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
-  },
-  timelineSubtitle: {
-    fontVariant: ['tabular-nums'],
-    marginTop: 2,
   },
 });
