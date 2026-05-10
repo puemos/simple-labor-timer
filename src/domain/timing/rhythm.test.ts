@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildRhythmSummary,
-  defaultRhythmSelectedEventId,
-  rhythmEventDetail,
-  rhythmStatusText,
-} from '@/domain/timing/rhythm';
+import { buildRhythmInsight, buildRhythmSummary, rhythmStatusText } from '@/domain/timing/rhythm';
 import { ContractionEvent } from '@/domain/types';
 
 const now = '2026-05-10T10:00:00.000Z';
@@ -61,7 +56,6 @@ describe('rhythm summaries', () => {
     expect(summary.eventCount).toBe(2);
     expect(summary.points.at(-1)?.active).toBe(true);
     expect(summary.points.at(-1)?.durationSeconds).toBe(120);
-    expect(defaultRhythmSelectedEventId(summary)).toBe(active.id);
   });
 
   it('excludes deleted events', () => {
@@ -133,13 +127,116 @@ describe('rhythm summaries', () => {
     expect(rhythmStatusText(irregular.pattern)).toBe('Irregular');
   });
 
-  it('returns selected event details', () => {
-    const summary = buildRhythmSummary([event('event_1', -10), event('event_2', -5, 75)], now);
+  it('explains when there is not enough data for a rhythm readout', () => {
+    const summary = buildRhythmSummary([event('event_1', -10)], now);
 
-    expect(rhythmEventDetail(summary, 'event_2')).toMatchObject({
-      durationSeconds: 75,
-      intervalSeconds: 300,
-      restGapSeconds: 240,
+    expect(buildRhythmInsight(summary)).toMatchObject({
+      headline: 'Too early to tell',
+      body: 'Time the next contraction to start reading the rhythm.',
+      action: 'Keep timing the next contraction.',
+      tone: 'neutral',
+    });
+  });
+
+  it('explains a regular rhythm readout', () => {
+    const summary = buildRhythmSummary(
+      [event('a', -24), event('b', -18), event('c', -12), event('d', -6)],
+      now,
+    );
+
+    expect(buildRhythmInsight(summary)).toMatchObject({
+      headline: 'Holding steady',
+      body: 'Contractions are coming in a steady rhythm.',
+      action: 'Keep timing and watch duration.',
+      tone: 'success',
+    });
+  });
+
+  it('explains a getting closer rhythm readout', () => {
+    const summary = buildRhythmSummary(
+      [event('a', -30), event('b', -22), event('c', -15), event('d', -10), event('e', -5)],
+      now,
+    );
+
+    expect(buildRhythmInsight(summary)).toMatchObject({
+      headline: 'Getting closer',
+      body: 'Intervals are getting closer. Keep timing and follow your call rule.',
+      action: 'Call if this matches your care team rule.',
+      tone: 'accent',
+    });
+  });
+
+  it('explains a spacing out rhythm readout', () => {
+    const summary = buildRhythmSummary(
+      [event('a', -30), event('b', -25), event('c', -20), event('d', -12), event('e', -3)],
+      now,
+    );
+
+    expect(buildRhythmInsight(summary)).toMatchObject({
+      headline: 'Spacing out',
+      body: 'Intervals are getting farther apart.',
+      action: 'Keep timing; rest if you can.',
+      tone: 'warning',
+    });
+  });
+
+  it('explains an irregular rhythm readout', () => {
+    const summary = buildRhythmSummary(
+      [event('a', -30), event('b', -22), event('c', -16), event('d', -10), event('e', -2)],
+      now,
+    );
+
+    expect(buildRhythmInsight(summary)).toMatchObject({
+      headline: 'Irregular',
+      body: 'Intervals are still changing from one contraction to the next.',
+      action: 'Keep timing until a clearer pattern appears.',
+      tone: 'neutral',
+    });
+  });
+
+  it('prioritizes the saved provider call rule over pattern text', () => {
+    const summary = buildRhythmSummary(
+      [event('a', -24), event('b', -18), event('c', -12), event('d', -6)],
+      now,
+    );
+
+    expect(
+      buildRhythmInsight(summary, {
+        providerRuleResult: {
+          met: true,
+          message: 'This matches your saved call rule. Contact your care team.',
+        },
+      }),
+    ).toMatchObject({
+      headline: 'Call now',
+      body: 'This matches your saved call rule. Contact your care team.',
+      action: 'Call your care team.',
+      tone: 'urgent',
+    });
+  });
+
+  it('prioritizes urgent rule warnings over the provider call rule', () => {
+    const summary = buildRhythmSummary(
+      [event('a', -24), event('b', -18), event('c', -12), event('d', -6)],
+      now,
+    );
+
+    expect(
+      buildRhythmInsight(summary, {
+        providerRuleResult: {
+          met: true,
+          message: 'This matches your saved call rule. Contact your care team.',
+        },
+        urgentRuleResult: {
+          active: true,
+          message: 'This contraction has lasted longer than 2 minutes. Contact your care team urgently.',
+        },
+      }),
+    ).toMatchObject({
+      headline: 'Call now',
+      body: 'This contraction has lasted longer than 2 minutes. Contact your care team urgently.',
+      action: 'Contact your care team now.',
+      tone: 'urgent',
     });
   });
 });

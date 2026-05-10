@@ -7,7 +7,7 @@ import {
   parseIso,
   visibleEvents,
 } from '@/domain/timing/timeMath';
-import { ContractionEvent, PatternLabel } from '@/domain/types';
+import { ContractionEvent, PatternLabel, ProviderRuleResult, UrgentRuleResult } from '@/domain/types';
 
 export const DEFAULT_RHYTHM_WINDOW_MINUTES = 60;
 
@@ -41,11 +41,18 @@ export type RhythmSummary = {
   pattern: PatternLabel;
 };
 
-export type RhythmEventDetail = {
-  event: ContractionEvent;
-  durationSeconds: number;
-  intervalSeconds?: number;
-  restGapSeconds?: number;
+export type RhythmInsightTone = 'neutral' | 'accent' | 'success' | 'warning' | 'urgent';
+
+export type RhythmInsight = {
+  headline: string;
+  body: string;
+  action: string;
+  tone: RhythmInsightTone;
+};
+
+export type RhythmInsightOptions = {
+  providerRuleResult?: Pick<ProviderRuleResult, 'met' | 'message'>;
+  urgentRuleResult?: Pick<UrgentRuleResult, 'active' | 'message'>;
 };
 
 export function buildRhythmSummary(
@@ -116,25 +123,65 @@ export function rhythmStatusText(pattern: PatternLabel): string {
   }
 }
 
-export function defaultRhythmSelectedEventId(summary: RhythmSummary): string | undefined {
-  const active = summary.points.find((point) => point.active);
-  if (active) {
-    return active.event.id;
+export function buildRhythmInsight(summary: RhythmSummary, options: RhythmInsightOptions = {}): RhythmInsight {
+  if (options.urgentRuleResult?.active) {
+    return {
+      headline: 'Call now',
+      body: options.urgentRuleResult.message ?? 'A warning sign is active. Contact your care team now.',
+      action: 'Contact your care team now.',
+      tone: 'urgent',
+    };
   }
-  return summary.points.at(-1)?.event.id;
-}
 
-export function rhythmEventDetail(summary: RhythmSummary, eventId: string | undefined): RhythmEventDetail | undefined {
-  const point = summary.points.find((item) => item.event.id === eventId);
-  if (!point) {
-    return undefined;
+  if (options.providerRuleResult?.met) {
+    return {
+      headline: 'Call now',
+      body: options.providerRuleResult.message,
+      action: 'Call your care team.',
+      tone: 'urgent',
+    };
   }
-  return {
-    event: point.event,
-    durationSeconds: point.durationSeconds,
-    intervalSeconds: point.intervalSeconds,
-    restGapSeconds: point.restGapSeconds,
-  };
+
+  switch (summary.pattern) {
+    case 'getting_closer':
+      return {
+        headline: 'Getting closer',
+        body: 'Intervals are getting closer. Keep timing and follow your call rule.',
+        action: 'Call if this matches your care team rule.',
+        tone: 'accent',
+      };
+    case 'regular':
+      return {
+        headline: 'Holding steady',
+        body: 'Contractions are coming in a steady rhythm.',
+        action: 'Keep timing and watch duration.',
+        tone: 'success',
+      };
+    case 'spacing_out':
+      return {
+        headline: 'Spacing out',
+        body: 'Intervals are getting farther apart.',
+        action: 'Keep timing; rest if you can.',
+        tone: 'warning',
+      };
+    case 'inconsistent':
+      return {
+        headline: 'Irregular',
+        body: 'Intervals are still changing from one contraction to the next.',
+        action: 'Keep timing until a clearer pattern appears.',
+        tone: 'neutral',
+      };
+    case 'insufficient_data':
+      return {
+        headline: 'Too early to tell',
+        body:
+          summary.eventCount < 2
+            ? 'Time the next contraction to start reading the rhythm.'
+            : 'Keep timing until the rhythm is clearer.',
+        action: 'Keep timing the next contraction.',
+        tone: 'neutral',
+      };
+  }
 }
 
 function previousVisibleEvent(events: ContractionEvent[], event: ContractionEvent): ContractionEvent | undefined {

@@ -5,6 +5,7 @@ export { ContractionRhythmChart } from '@/ui/components/ContractionRhythmChart';
 export { DateTimeField } from '@/ui/components/DateTimeField';
 export { EmptyState } from '@/ui/components/EmptyState';
 export { IconButton } from '@/ui/components/IconButton';
+export { intensityColor, intensityLabel } from '@/ui/components/intensity';
 export { ListRow } from '@/ui/components/ListRow';
 export type { ListRowTrailing } from '@/ui/components/ListRow';
 export { ListSection } from '@/ui/components/ListSection';

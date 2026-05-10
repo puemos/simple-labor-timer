@@ -1,111 +1,99 @@
 import { View } from 'react-native';
-import { formatTimeOnly } from '@/domain/timing/dateFormat';
-import { RhythmEventDetail } from '@/domain/timing/rhythm';
-import { formatShortDuration } from '@/domain/timing/timeMath';
-import { Intensity } from '@/domain/types';
-import { Button } from '@/ui/components/Button';
+import { RhythmInsight, RhythmInsightTone } from '@/domain/timing/rhythm';
 import { Card } from '@/ui/components/Card';
-import { Caption1, Footnote, Headline, Subhead } from '@/ui/components/Text';
-import { Icons } from '@/ui/icons';
+import { Callout, Caption1, Headline, Title3 } from '@/ui/components/Text';
+import { Icons, ICON_STROKE_WIDTH } from '@/ui/icons';
 import { useTheme } from '@/ui/theme';
 
 type RhythmDetailPanelProps = {
-  detail?: RhythmEventDetail;
-  onOpenEvent?: (eventId: string) => void;
+  insight: RhythmInsight;
 };
 
-export function RhythmDetailPanel({ detail, onOpenEvent }: RhythmDetailPanelProps) {
-  const { colors, spacing } = useTheme();
-
-  if (!detail) {
-    return (
-      <Card background="grouped">
-        <Headline>Select a contraction</Headline>
-        <Footnote color="secondary" style={{ marginTop: spacing.xs }}>
-          Tap a rhythm block to inspect its timing.
-        </Footnote>
-      </Card>
-    );
-  }
+export function RhythmDetailPanel({ insight }: RhythmDetailPanelProps) {
+  const { colors, radii, spacing } = useTheme();
+  const tone = insightTone(insight.tone, colors);
+  const Icon = insight.tone === 'urgent' ? Icons.AlertTriangle : Icons.Waves;
 
   return (
     <Card background="grouped">
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <Headline>Selected contraction</Headline>
-          <Footnote color="secondary" style={{ marginTop: 2 }}>
-            Started {formatTimeOnly(detail.event.startAt)}
-          </Footnote>
-        </View>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
         <View
+          accessibilityElementsHidden
+          importantForAccessibility="no"
           style={{
-            backgroundColor: colors.tertiarySystemFill,
-            borderRadius: 999,
-            paddingHorizontal: spacing.sm,
-            paddingVertical: 4,
+            width: 36,
+            height: 36,
+            borderRadius: radii.md,
+            backgroundColor: tone.iconBackground,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          <Caption1 style={{ fontWeight: '700', color: colors.secondaryLabel }}>
-            {intensityLabel(detail.event.intensity)}
-          </Caption1>
+          <Icon color={tone.iconColor} size={20} strokeWidth={ICON_STROKE_WIDTH} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Title3 numberOfLines={1} style={{ fontWeight: '700' }}>
+            {insight.headline}
+          </Title3>
+          <Callout color="secondary" style={{ marginTop: spacing.xs }}>
+            {insight.body}
+          </Callout>
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.base }}>
-        <DetailMetric label="Duration" value={formatShortDuration(detail.durationSeconds)} />
-        <DetailMetric label="Interval" value={formatShortDuration(detail.intervalSeconds)} />
-        <DetailMetric label="Rest" value={formatShortDuration(detail.restGapSeconds)} />
+      <View
+        style={{
+          marginTop: spacing.base,
+          borderRadius: radii.md,
+          backgroundColor: tone.actionBackground,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+        }}
+      >
+        <Caption1 style={{ color: tone.actionLabel, fontWeight: '700', textTransform: 'uppercase' }}>Next</Caption1>
+        <Headline style={{ color: tone.actionLabel, marginTop: 2 }}>{insight.action}</Headline>
       </View>
-
-      {onOpenEvent ? (
-        <Button
-          variant="gray"
-          size="md"
-          label="Open details"
-          trailingIcon={Icons.ChevronRight}
-          onPress={() => onOpenEvent(detail.event.id)}
-          fullWidth
-          style={{ marginTop: spacing.base }}
-        />
-      ) : null}
     </Card>
   );
 }
 
-function DetailMetric({ label, value }: { label: string; value: string }) {
-  const { colors, radii, spacing } = useTheme();
-  return (
-    <View
-      style={{
-        flex: 1,
-        minWidth: 0,
-        borderRadius: radii.md,
-        backgroundColor: colors.tertiarySystemFill,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.sm,
-      }}
-    >
-      <Caption1 color="secondary" numberOfLines={1}>
-        {label}
-      </Caption1>
-      <Subhead style={{ marginTop: 2, fontWeight: '700', fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-        {value}
-      </Subhead>
-    </View>
-  );
-}
-
-function intensityLabel(intensity: Intensity | undefined): string {
-  switch (intensity) {
-    case 'mild':
-      return 'Mild';
-    case 'moderate':
-      return 'Moderate';
-    case 'strong':
-      return 'Strong';
-    case 'cannot_talk_walk':
-      return "Can't talk";
-    default:
-      return 'Unrated';
+function insightTone(tone: RhythmInsightTone, colors: ReturnType<typeof useTheme>['colors']) {
+  switch (tone) {
+    case 'urgent':
+      return {
+        iconBackground: colors.urgent,
+        iconColor: colors.onUrgent,
+        actionBackground: colors.urgent,
+        actionLabel: colors.onUrgent,
+      };
+    case 'accent':
+      return {
+        iconBackground: colors.systemFill,
+        iconColor: colors.accent,
+        actionBackground: colors.tertiarySystemFill,
+        actionLabel: colors.label,
+      };
+    case 'success':
+      return {
+        iconBackground: colors.tertiarySystemFill,
+        iconColor: colors.success,
+        actionBackground: colors.tertiarySystemFill,
+        actionLabel: colors.label,
+      };
+    case 'warning':
+      return {
+        iconBackground: colors.tertiarySystemFill,
+        iconColor: colors.warning,
+        actionBackground: colors.tertiarySystemFill,
+        actionLabel: colors.label,
+      };
+    case 'neutral':
+      return {
+        iconBackground: colors.tertiarySystemFill,
+        iconColor: colors.secondaryLabel,
+        actionBackground: colors.tertiarySystemFill,
+        actionLabel: colors.label,
+      };
   }
 }

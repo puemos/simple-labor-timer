@@ -1,12 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ScrollView, View } from 'react-native';
-import {
-  buildRhythmSummary,
-  defaultRhythmSelectedEventId,
-  rhythmEventDetail,
-  rhythmStatusText,
-} from '@/domain/timing/rhythm';
+import { buildRhythmInsight, buildRhythmSummary, rhythmStatusText } from '@/domain/timing/rhythm';
 import { formatShortDuration, visibleEvents } from '@/domain/timing/timeMath';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
@@ -19,7 +14,6 @@ import {
   IconButton,
   RhythmDetailPanel,
   Sheet,
-  Subhead,
   Title2,
 } from '@/ui/components';
 import { Icons } from '@/ui/icons';
@@ -27,13 +21,12 @@ import { useTheme } from '@/ui/theme';
 
 type RhythmParams = {
   sessionId?: string;
-  selectedEventId?: string;
 };
 
 export default function RhythmRoute() {
   const { colors, radii, spacing } = useTheme();
-  const { sessionId, selectedEventId } = useLocalSearchParams<RhythmParams>();
-  const { now, snapshot } = useContractionApp();
+  const { sessionId } = useLocalSearchParams<RhythmParams>();
+  const { now, providerRuleResult, snapshot, urgentRuleResult } = useContractionApp();
   const session = useMemo(() => {
     if (!snapshot) {
       return undefined;
@@ -63,25 +56,21 @@ export default function RhythmRoute() {
     () => buildRhythmSummary(events, rangeEndAt, { rangeStartAt, rangeEndAt }),
     [events, rangeEndAt, rangeStartAt],
   );
-  const routeSelectedId = selectedEventId && summary.points.some((point) => point.event.id === selectedEventId)
-    ? selectedEventId
-    : undefined;
-  const defaultSelectedId = useMemo(() => routeSelectedId ?? defaultRhythmSelectedEventId(summary), [routeSelectedId, summary]);
-  const [selectedId, setSelectedId] = useState<string | undefined>(defaultSelectedId);
-
-  useEffect(() => {
-    const stillVisible = selectedId && summary.points.some((point) => point.event.id === selectedId);
-    if (!stillVisible) {
-      setSelectedId(defaultSelectedId);
-    }
-  }, [defaultSelectedId, selectedId, summary.points]);
-
-  const detail = rhythmEventDetail(summary, selectedId);
   const status = rhythmStatusText(summary.pattern);
+  const isCurrentSession = !sessionId || session?.id === snapshot?.activeSession?.id;
+  const insight = useMemo(
+    () =>
+      buildRhythmInsight(summary, {
+        providerRuleResult: isCurrentSession ? providerRuleResult : undefined,
+        urgentRuleResult: isCurrentSession ? urgentRuleResult : undefined,
+      }),
+    [isCurrentSession, providerRuleResult, summary, urgentRuleResult],
+  );
 
   return (
     <Sheet background="grouped">
       <View
+        collapsable={false}
         style={{
           paddingHorizontal: spacing.base,
           paddingTop: spacing.base,
@@ -114,9 +103,6 @@ export default function RhythmRoute() {
                   <Title2 style={{ marginTop: spacing.xs, fontVariant: ['tabular-nums'] }}>
                     {formatShortDuration(summary.averageIntervalSeconds)}
                   </Title2>
-                  <Subhead color="secondary" style={{ marginTop: 2 }}>
-                    average start-to-start interval
-                  </Subhead>
                 </View>
                 <View
                   style={{
@@ -130,29 +116,19 @@ export default function RhythmRoute() {
                 </View>
               </View>
               <Footnote color="secondary" style={{ marginTop: spacing.base }}>
-                {summary.eventCount} {summary.eventCount === 1 ? 'contraction' : 'contractions'} ·{' '}
-                {formatShortDuration(summary.averageDurationSeconds)} avg duration
+                {summary.eventCount} {summary.eventCount === 1 ? 'contraction' : 'contractions'}
               </Footnote>
+              <View style={{ marginTop: spacing.base }}>
+                <ContractionRhythmChart
+                  events={events}
+                  now={rangeEndAt}
+                  rangeStartAt={rangeStartAt}
+                  rangeEndAt={rangeEndAt}
+                />
+              </View>
             </Card>
 
-            <View style={{ gap: spacing.sm }}>
-              <View style={{ paddingHorizontal: 2 }}>
-                <Headline>Timeline</Headline>
-                <Footnote color="secondary" style={{ marginTop: 2 }}>
-                  Blocks show contraction duration. Gaps show rest and frequency.
-                </Footnote>
-              </View>
-              <ContractionRhythmChart
-                events={events}
-                now={rangeEndAt}
-                rangeStartAt={rangeStartAt}
-                rangeEndAt={rangeEndAt}
-                selectedEventId={selectedId}
-                onSelectEvent={setSelectedId}
-              />
-            </View>
-
-            <RhythmDetailPanel detail={detail} onOpenEvent={(eventId) => router.dismissTo({ pathname: '/history/[id]', params: { id: eventId } })} />
+            <RhythmDetailPanel insight={insight} />
           </>
         )}
       </ScrollView>

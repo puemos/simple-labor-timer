@@ -4,7 +4,7 @@ import { Alert, View } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { hapticSelection } from '@/native/haptics';
 import { formatEditableDateTime, formatTimeOnly, normalizeDateTimeToIso } from '@/domain/timing/dateFormat';
-import { buildRhythmSummary, defaultRhythmSelectedEventId } from '@/domain/timing/rhythm';
+import { buildRhythmSummary } from '@/domain/timing/rhythm';
 import { eventDurationSeconds, eventIntervalSeconds, eventRestGapSeconds, formatShortDuration, visibleEvents } from '@/domain/timing/timeMath';
 import { ContractionEvent, ContractionSession } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
@@ -78,10 +78,7 @@ export default function HistoryRoute() {
             onPress={() =>
               router.push({
                 pathname: '/rhythm',
-                params: {
-                  sessionId: rhythmSession.id,
-                  selectedEventId: defaultRhythmSelectedEventId(rhythmSummary),
-                },
+                params: { sessionId: rhythmSession.id },
               })
             }
           />
