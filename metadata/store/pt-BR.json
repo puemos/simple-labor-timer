@@ -1,0 +1,12 @@
+{
+  "title": "Cronômetro de contrações",
+  "subtitle": "Registro privado de contrações",
+  "shortDescription": "Acompanhe contrações, sinais de alerta e resumos locais.",
+  "fullDescription": "Cronômetro de contrações é um timer local para registrar duração, ritmo, regras de ligação da equipe de cuidado e sinais urgentes. Os dados ficam no dispositivo, a menos que você compartilhe uma exportação.",
+  "keywords": "contração,cronômetro,gravidez,parto,nascimento,parteira,doula",
+  "screenshots": {
+    "timer": "Cronometre contrações com um controle grande.",
+    "history": "Revise sessões, ritmo e notas.",
+    "share": "Compartilhe resumos locais com sua equipe de cuidado."
+  }
+}

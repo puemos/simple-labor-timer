@@ -1,0 +1,12 @@
+{
+  "title": "Simple Labor Timer",
+  "subtitle": "Free, private contraction log",
+  "shortDescription": "Free, private contraction timing with no ads or subscriptions.",
+  "fullDescription": "Simple Labor Timer is a local-first timer for recording contraction duration, rhythm, care-team call rules, and urgent warning signs. Data stays on device unless you choose to share an export.",
+  "keywords": "contraction,timer,pregnancy,labor,birth,midwife,doula",
+  "screenshots": {
+    "timer": "Time contractions with one large control.",
+    "history": "Review sessions, rhythm, and notes.",
+    "share": "Share local summaries with your care team."
+  }
+}

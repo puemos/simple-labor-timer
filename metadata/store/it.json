@@ -1,0 +1,12 @@
+{
+  "title": "Timer contrazioni",
+  "subtitle": "Timer privato per contrazioni e condivisione",
+  "shortDescription": "Tieni traccia di contrazioni, segnali di allarme e riepiloghi locali.",
+  "fullDescription": "Timer contrazioni è un timer locale per registrare durata, ritmo, regole di chiamata dell'equipe di cura e segnali urgenti. I dati restano sul dispositivo salvo condivisione esplicita.",
+  "keywords": "contrazioni,timer,gravidanza,travaglio,parto,ostetrica,doula",
+  "screenshots": {
+    "timer": "Cronometra le contrazioni con un grande controllo.",
+    "history": "Rivedi sessioni, ritmo e note.",
+    "share": "Condividi riepiloghi locali con la tua equipe di cura."
+  }
+}

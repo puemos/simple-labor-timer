@@ -1,0 +1,12 @@
+{
+  "title": "Temporizador de contracciones",
+  "subtitle": "Registro privado de contracciones",
+  "shortDescription": "Registra contracciones, señales de alerta y resúmenes locales.",
+  "fullDescription": "Temporizador de contracciones es un temporizador local para registrar duración, ritmo, reglas de llamada del equipo de atención y señales urgentes. Los datos permanecen en el dispositivo salvo que decidas compartir una exportación.",
+  "keywords": "contracción,temporizador,embarazo,parto,nacimiento,matrona,doula",
+  "screenshots": {
+    "timer": "Cronometra contracciones con un control grande.",
+    "history": "Revisa sesiones, ritmo y notas.",
+    "share": "Comparte resúmenes locales con tu equipo de atención."
+  }
+}

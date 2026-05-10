@@ -1,0 +1,12 @@
+{
+  "title": "Wehen-Timer",
+  "subtitle": "Privates Timing und Teilen von Wehen",
+  "shortDescription": "Wehen, Warnzeichen und lokale Zusammenfassungen erfassen.",
+  "fullDescription": "Wehen-Timer ist ein lokaler Timer zum Erfassen von Wehendauer, Rhythmus, Anrufregeln des Betreuungsteams und dringenden Warnzeichen. Daten bleiben auf dem Gerät, außer du teilst einen Export.",
+  "keywords": "wehen,timer,schwangerschaft,geburt,hebamme,doula",
+  "screenshots": {
+    "timer": "Wehen mit einer großen Taste stoppen.",
+    "history": "Sitzungen, Rhythmus und Notizen prüfen.",
+    "share": "Lokale Zusammenfassungen mit dem Betreuungsteam teilen."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "title": "Minuteur contractions",
+  "subtitle": "Chronométrage privé des contractions",
+  "shortDescription": "Suivez contractions, signes d'alerte et résumés locaux.",
+  "fullDescription": "Minuteur contractions est un minuteur local pour enregistrer la durée des contractions, leur rythme, les règles d'appel de l'équipe soignante et les signes urgents. Les données restent sur l'appareil sauf partage volontaire.",
+  "keywords": "contraction,minuteur,grossesse,travail,naissance,sage-femme,doula",
+  "screenshots": {
+    "timer": "Chronométrez les contractions avec une grande commande.",
+    "history": "Consultez les sessions, le rythme et les notes.",
+    "share": "Partagez des résumés locaux avec votre équipe soignante."
+  }
+}
