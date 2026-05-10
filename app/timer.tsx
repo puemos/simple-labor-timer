@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import * as KeepAwake from 'expo-keep-awake';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -44,9 +44,12 @@ export default function TimerRoute() {
   const { actions, busy, error, loading, now, providerRuleResult, snapshot, summary, urgentRuleResult } = useContractionApp();
   const insets = useSafeAreaInsets();
   const previousRuleMet = useRef(false);
+  const [showStartupIdle, setShowStartupIdle] = useState(true);
   const measuring = summary.timerState === 'measuring';
   const resting = summary.timerState === 'resting';
-  const currentSessionEvents = useMemo(() => visibleEvents(snapshot?.events ?? []), [snapshot?.events]);
+  const presentingStartupIdle = showStartupIdle && !measuring;
+  const presentingResting = resting && !presentingStartupIdle;
+  const sessionEvents = useMemo(() => visibleEvents(snapshot?.events ?? []), [snapshot?.events]);
 
   useEffect(() => {
     if (!measuring) {
@@ -64,6 +67,12 @@ export default function TimerRoute() {
     }
     previousRuleMet.current = providerRuleResult.met;
   }, [providerRuleResult.met]);
+
+  useEffect(() => {
+    if (measuring) {
+      setShowStartupIdle(false);
+    }
+  }, [measuring]);
 
   function handleTimerPress() {
     if (measuring) {
@@ -98,7 +107,25 @@ export default function TimerRoute() {
   }
 
   const urgentActive = urgentRuleResult.active;
-  const stateLabel = measuring ? 'Now timing' : resting ? 'Resting' : 'Idle';
+  const showCurrentSessionDetails = Boolean(snapshot.activeSession && summary.timerState !== 'idle');
+  const currentSessionEvents = showCurrentSessionDetails ? sessionEvents : [];
+  const lastDurationSeconds = showCurrentSessionDetails ? summary.lastDurationSeconds : undefined;
+  const lastIntervalSeconds = showCurrentSessionDetails ? summary.lastIntervalSeconds : undefined;
+  const callRuleMet = showCurrentSessionDetails && providerRuleResult.met;
+  const homeAlert = urgentActive
+    ? {
+        accessibilityLabel: 'Urgent contact warning',
+        message: urgentRuleResult.message ?? 'A warning sign is active. Contact your care team now.',
+        onPress: () => router.push('/urgent'),
+      }
+    : callRuleMet
+      ? {
+          accessibilityLabel: 'Saved call rule matched',
+          message: providerRuleResult.message,
+          onPress: () => callNumber(snapshot.profile.careTeamPhone || snapshot.profile.birthLocationPhone),
+        }
+      : undefined;
+  const stateLabel = measuring ? 'Now timing' : presentingResting ? 'Resting' : 'Ready when you are';
   const timerActionLabel = measuring ? 'End contraction' : 'Start contraction';
   const badgeBg = measuring ? colors.contractionActive : colors.systemFill;
   const badgeColor = measuring ? colors.onContractionActive : colors.label;
@@ -112,7 +139,7 @@ export default function TimerRoute() {
   const actionLabelColor = measuring ? colors.onContractionActive : colors.onAccent;
   const timerSeconds = measuring
     ? formatActiveDuration(summary.activeEvent?.startAt, now)
-    : resting
+    : presentingResting
       ? (summary.currentRestSeconds ?? 0)
       : 0;
   const timerLabel = formatDuration(timerSeconds);
@@ -166,12 +193,12 @@ export default function TimerRoute() {
           },
         ]}
       >
-        {urgentActive ? (
+        {homeAlert ? (
           <Animated.View entering={FadeIn.springify().damping(18).stiffness(180)} exiting={FadeOut.duration(160)}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Urgent contact warning"
-              onPress={() => router.push('/urgent')}
+              accessibilityLabel={homeAlert.accessibilityLabel}
+              onPress={homeAlert.onPress}
               style={({ pressed }) => [
                 {
                   backgroundColor: colors.urgent,
@@ -185,9 +212,14 @@ export default function TimerRoute() {
               ]}
             >
               <Icons.AlertTriangle color={colors.onUrgent} size={20} strokeWidth={2} />
-              <Headline color="onUrgent" style={{ flex: 1 }} numberOfLines={2}>
-                {urgentRuleResult.message}
-              </Headline>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Headline color="onUrgent" numberOfLines={1}>
+                  Call now
+                </Headline>
+                <Footnote color="onUrgent" style={styles.homeAlertBody} numberOfLines={2}>
+                  {homeAlert.message}
+                </Footnote>
+              </View>
               <Icons.ChevronRight color={colors.onUrgent} size={18} strokeWidth={2} />
             </Pressable>
           </Animated.View>
@@ -247,7 +279,7 @@ export default function TimerRoute() {
             </Animated.Text>
 
             <Subhead color="secondary" style={{ textAlign: 'center' }}>
-              {measuring ? 'Tap anywhere to end' : resting ? 'Tap anywhere to start the next' : 'Tap anywhere to start'}
+              {measuring ? 'Tap anywhere to end' : presentingResting ? 'Tap anywhere to start the next' : 'Tap anywhere to start timing'}
             </Subhead>
 
             <View
@@ -269,8 +301,8 @@ export default function TimerRoute() {
         </Pressable>
 
         <View style={[styles.metrics, { gap: spacing.sm }]}>
-          <MetricTile label="Duration" value={formatShortDuration(summary.lastDurationSeconds)} icon={Icons.Timer} />
-          <MetricTile label="Interval" value={formatShortDuration(summary.lastIntervalSeconds)} icon={Icons.Clock} />
+          <MetricTile label="Duration" value={formatShortDuration(lastDurationSeconds)} icon={Icons.Timer} />
+          <MetricTile label="Interval" value={formatShortDuration(lastIntervalSeconds)} icon={Icons.Clock} />
         </View>
 
         <RhythmStatusControl
@@ -575,6 +607,9 @@ const styles = StyleSheet.create({
   heroActionLabel: {
     fontWeight: '700',
     textAlign: 'center',
+  },
+  homeAlertBody: {
+    marginTop: 2,
   },
   metrics: {
     flexDirection: 'row',
