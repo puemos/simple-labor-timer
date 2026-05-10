@@ -1,5 +1,6 @@
 import { CONTENT_VERSION } from '@/domain/appConstants';
 import { AppRepositoryContract } from '@/data/repositoryContract';
+import { shouldStartNewSessionAfterGap } from '@/domain/timing/sessionGrouping';
 import { makeId, nowIso, parseIso, visibleEvents } from '@/domain/timing/timeMath';
 import {
   AppSnapshot,
@@ -14,7 +15,7 @@ import {
 export class MemoryRepository implements AppRepositoryContract {
   private profile: PregnancyProfile;
   private providerRule: ProviderRule;
-  private activeSession?: ContractionSession;
+  private sessions: ContractionSession[] = [];
   private events: ContractionEvent[] = [];
   private urgentEvents: UrgentEvent[] = [];
 
@@ -43,13 +44,14 @@ export class MemoryRepository implements AppRepositoryContract {
     };
   }
 
-  async loadSnapshot(): Promise<AppSnapshot> {
+  async loadSnapshot(at = nowIso()): Promise<AppSnapshot> {
+    this.closeStaleActiveSession(at);
     return this.snapshot();
   }
 
   async startContraction(at = nowIso()): Promise<AppSnapshot> {
     const session = this.ensureSession(at);
-    if (!visibleEvents(this.events).some((event) => !event.endAt)) {
+    if (!visibleEvents(this.events).some((event) => event.sessionId === session.id && !event.endAt)) {
       this.events.push({
         id: makeId('event'),
         sessionId: session.id,
@@ -65,7 +67,10 @@ export class MemoryRepository implements AppRepositoryContract {
   }
 
   async endContraction(at = nowIso()): Promise<AppSnapshot> {
-    const active = visibleEvents(this.events).find((event) => !event.endAt);
+    const session = this.getActiveSession();
+    const active = session
+      ? visibleEvents(this.events).find((event) => event.sessionId === session.id && !event.endAt)
+      : undefined;
     if (active) {
       active.endAt = parseIso(at) < parseIso(active.startAt) ? active.startAt : at;
       active.updatedAt = at;
@@ -74,7 +79,12 @@ export class MemoryRepository implements AppRepositoryContract {
   }
 
   async undoLastAction(at = nowIso()): Promise<AppSnapshot> {
-    const latest = visibleEvents(this.events).sort((a, b) => parseIso(b.updatedAt) - parseIso(a.updatedAt))[0];
+    const session = this.getActiveSession();
+    const latest = session
+      ? visibleEvents(this.events)
+          .filter((event) => event.sessionId === session.id)
+          .sort((a, b) => parseIso(b.updatedAt) - parseIso(a.updatedAt))[0]
+      : undefined;
     if (latest) {
       latest.deletedAt = at;
       latest.updatedAt = at;
@@ -158,7 +168,10 @@ export class MemoryRepository implements AppRepositoryContract {
   }
 
   async mergeWithPrevious(eventId: string, at = nowIso()): Promise<AppSnapshot> {
-    const ordered = visibleEvents(this.events);
+    const currentEvent = this.events.find((item) => item.id === eventId);
+    const ordered = currentEvent
+      ? visibleEvents(this.events).filter((event) => event.sessionId === currentEvent.sessionId)
+      : [];
     const index = ordered.findIndex((event) => event.id === eventId);
     if (index > 0) {
       const previous = ordered[index - 1];
@@ -175,10 +188,11 @@ export class MemoryRepository implements AppRepositoryContract {
   }
 
   async recordUrgent(type: UrgentType, note?: string, consentToRecord = true, at = nowIso()): Promise<AppSnapshot> {
+    const session = this.getActiveSession();
     if (consentToRecord) {
       this.urgentEvents.unshift({
         id: makeId('urgent'),
-        sessionId: this.activeSession?.id,
+        sessionId: session?.id,
         type,
         occurredAt: at,
         timezone: currentTimeZone(),
@@ -203,42 +217,87 @@ export class MemoryRepository implements AppRepositoryContract {
   }
 
   async closeSession(at = nowIso()): Promise<AppSnapshot> {
-    if (this.activeSession) {
-      this.activeSession = { ...this.activeSession, status: 'closed', endedAt: at, updatedAt: at };
+    const session = this.getActiveSession();
+    if (session) {
+      Object.assign(session, { status: 'closed' as const, endedAt: at, updatedAt: at });
     }
     return this.snapshot();
   }
 
   async deleteAllData(): Promise<AppSnapshot> {
-    this.activeSession = undefined;
+    this.sessions = [];
     this.events = [];
     this.urgentEvents = [];
     return this.snapshot();
   }
 
   private ensureSession(startedAt: string): ContractionSession {
-    if (!this.activeSession || this.activeSession.status !== 'active') {
-      this.activeSession = {
-        id: makeId('session'),
-        startedAt,
-        status: 'active',
-        contentVersion: CONTENT_VERSION,
-        createdAt: startedAt,
-        updatedAt: startedAt,
-      };
+    this.closeStaleActiveSession(startedAt);
+    const existing = this.getActiveSession();
+    if (existing) {
+      return existing;
     }
-    return this.activeSession;
+    const session: ContractionSession = {
+      id: makeId('session'),
+      startedAt,
+      status: 'active',
+      contentVersion: CONTENT_VERSION,
+      createdAt: startedAt,
+      updatedAt: startedAt,
+    };
+    this.sessions.push(session);
+    return session;
+  }
+
+  private closeStaleActiveSession(at: string): void {
+    const session = this.getActiveSession();
+    if (!session) {
+      return;
+    }
+    const active = visibleEvents(this.events).some((event) => event.sessionId === session.id && !event.endAt);
+    if (active) {
+      return;
+    }
+    const latestEnded = visibleEvents(this.events)
+      .filter((event) => event.sessionId === session.id && event.endAt)
+      .sort((a, b) => parseIso(b.endAt!) - parseIso(a.endAt!))[0];
+    if (shouldStartNewSessionAfterGap(latestEnded, at)) {
+      Object.assign(session, { status: 'closed' as const, endedAt: latestEnded.endAt, updatedAt: at });
+    }
+  }
+
+  private getActiveSession(): ContractionSession | undefined {
+    return this.sessions.find((session) => session.status === 'active');
   }
 
   private snapshot(): AppSnapshot {
+    const activeSession = this.getActiveSession();
+    const sessions = [...this.sessions].sort((a, b) => parseIso(b.startedAt) - parseIso(a.startedAt));
+    const latestSession = sessions[0];
+    const allEvents = [...this.events].sort((a, b) => parseIso(a.startAt) - parseIso(b.startAt));
+    const allUrgentEvents = [...this.urgentEvents].sort((a, b) => parseIso(b.occurredAt) - parseIso(a.occurredAt));
     return {
       profile: { ...this.profile },
       providerRule: { ...this.providerRule },
-      activeSession: this.activeSession ? { ...this.activeSession } : undefined,
-      events: this.events.map((event) => ({ ...event })),
-      urgentEvents: this.urgentEvents.map((event) => ({ ...event, sourceIds: [...event.sourceIds] })),
+      activeSession: activeSession ? { ...activeSession } : undefined,
+      latestSession: latestSession ? { ...latestSession } : undefined,
+      sessions: sessions.map((session) => ({ ...session })),
+      events: activeSession ? allEvents.filter((event) => event.sessionId === activeSession.id).map(copyEvent) : [],
+      allEvents: allEvents.map(copyEvent),
+      urgentEvents: activeSession
+        ? allUrgentEvents.filter((event) => event.sessionId === activeSession.id).map(copyUrgentEvent)
+        : [],
+      allUrgentEvents: allUrgentEvents.map(copyUrgentEvent),
     };
   }
+}
+
+function copyEvent(event: ContractionEvent): ContractionEvent {
+  return { ...event };
+}
+
+function copyUrgentEvent(event: UrgentEvent): UrgentEvent {
+  return { ...event, sourceIds: [...event.sourceIds] };
 }
 
 function currentTimeZone(): string {

@@ -1,7 +1,7 @@
 import { AppSnapshot, ContractionEvent, PregnancyProfile, ProviderRule, UrgentType } from '@/domain/types';
 
 export type AppRepositoryContract = {
-  loadSnapshot(): Promise<AppSnapshot>;
+  loadSnapshot(at?: string): Promise<AppSnapshot>;
   startContraction(at?: string): Promise<AppSnapshot>;
   endContraction(at?: string): Promise<AppSnapshot>;
   undoLastAction(at?: string): Promise<AppSnapshot>;

@@ -5,6 +5,7 @@ import { getOrCreateDatabaseKey } from '@/data/encryptionKey';
 import { MemoryRepository } from '@/data/memoryRepository';
 import { runMigrations } from '@/data/migrations';
 import { AppRepositoryContract } from '@/data/repositoryContract';
+import { shouldStartNewSessionAfterGap } from '@/domain/timing/sessionGrouping';
 import { makeId, nowIso, parseIso } from '@/domain/timing/timeMath';
 import {
   AppSnapshot,
@@ -108,13 +109,28 @@ export class AppRepository implements AppRepositoryContract {
     return repo;
   }
 
-  async loadSnapshot(): Promise<AppSnapshot> {
+  async loadSnapshot(at = nowIso()): Promise<AppSnapshot> {
+    await this.db.withTransactionAsync(async () => {
+      await this.closeStaleActiveSession(at);
+    });
     const profile = await this.getProfile();
     const providerRule = await this.getProviderRule(profile.id);
     const activeSession = await this.getActiveSession();
-    const events = activeSession ? await this.getEvents(activeSession.id, true) : [];
-    const urgentEvents = await this.getUrgentEvents(activeSession?.id);
-    return { profile, providerRule, activeSession, events, urgentEvents };
+    const sessions = await this.getSessions();
+    const latestSession = sessions[0];
+    const allEvents = await this.getAllEvents();
+    const allUrgentEvents = await this.getAllUrgentEvents();
+    return {
+      profile,
+      providerRule,
+      activeSession,
+      latestSession,
+      sessions,
+      events: activeSession ? allEvents.filter((event) => event.sessionId === activeSession.id) : [],
+      allEvents,
+      urgentEvents: activeSession ? allUrgentEvents.filter((event) => event.sessionId === activeSession.id) : [],
+      allUrgentEvents,
+    };
   }
 
   async startContraction(at = nowIso()): Promise<AppSnapshot> {
@@ -152,7 +168,7 @@ export class AppRepository implements AppRepositoryContract {
       );
       await this.writeRevision('contraction_event', event.id, 'start_contraction', undefined, event, 'timer_start', at);
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async endContraction(at = nowIso()): Promise<AppSnapshot> {
@@ -181,7 +197,7 @@ export class AppRepository implements AppRepositoryContract {
         at,
       );
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async undoLastAction(at = nowIso()): Promise<AppSnapshot> {
@@ -211,7 +227,7 @@ export class AppRepository implements AppRepositoryContract {
         at,
       );
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async deleteEvent(eventId: string, at = nowIso()): Promise<AppSnapshot> {
@@ -232,20 +248,15 @@ export class AppRepository implements AppRepositoryContract {
         at,
       );
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async restoreLatestDeleted(at = nowIso()): Promise<AppSnapshot> {
     await this.db.withTransactionAsync(async () => {
-      const session = await this.getActiveSession();
-      if (!session) {
-        return;
-      }
       const row = await this.db.getFirstAsync<EventRow>(
         `SELECT * FROM contraction_events
-         WHERE session_id = ? AND deleted_at IS NOT NULL
+         WHERE deleted_at IS NOT NULL
          ORDER BY deleted_at DESC LIMIT 1`,
-        session.id,
       );
       if (!row) {
         return;
@@ -262,7 +273,7 @@ export class AppRepository implements AppRepositoryContract {
         at,
       );
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async updateEvent(
@@ -301,7 +312,7 @@ export class AppRepository implements AppRepositoryContract {
       );
       await this.writeRevision('contraction_event', eventId, 'edit_event', before, after, 'manual_edit', at);
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async addMissedEvent(startAt: string, endAt: string, at = nowIso()): Promise<AppSnapshot> {
@@ -334,7 +345,7 @@ export class AppRepository implements AppRepositoryContract {
       );
       await this.writeRevision('contraction_event', event.id, 'add_missed_event', undefined, event, 'manual_add', at);
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async splitEvent(eventId: string, at = nowIso()): Promise<AppSnapshot> {
@@ -391,7 +402,7 @@ export class AppRepository implements AppRepositoryContract {
         at,
       );
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async mergeWithPrevious(eventId: string, at = nowIso()): Promise<AppSnapshot> {
@@ -423,7 +434,7 @@ export class AppRepository implements AppRepositoryContract {
       await this.db.runAsync('UPDATE contraction_events SET deleted_at = ?, manually_edited = 1, updated_at = ? WHERE id = ?', at, at, current.id);
       await this.writeRevision('contraction_event', previous.id, 'merge_events', { previous, current }, { previousId: previous.id }, 'merge', at);
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async recordUrgent(type: UrgentType, note?: string, consentToRecord = true, at = nowIso()): Promise<AppSnapshot> {
@@ -461,7 +472,7 @@ export class AppRepository implements AppRepositoryContract {
       );
       await this.writeRevision('urgent_event', event.id, 'record_urgent_event', undefined, event, 'urgent', at);
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async saveProfile(patch: Partial<PregnancyProfile>, at = nowIso()): Promise<AppSnapshot> {
@@ -487,7 +498,7 @@ export class AppRepository implements AppRepositoryContract {
       after.id,
     );
     await this.writeRevision('pregnancy_profile', after.id, 'update_profile', before, after, 'settings', at);
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async saveProviderRule(patch: Partial<ProviderRule>, at = nowIso()): Promise<AppSnapshot> {
@@ -521,7 +532,7 @@ export class AppRepository implements AppRepositoryContract {
       next.updatedAt,
     );
     await this.writeRevision('provider_rule', next.id, 'update_provider_rule', existing, next, 'settings', at);
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async closeSession(at = nowIso()): Promise<AppSnapshot> {
@@ -530,7 +541,7 @@ export class AppRepository implements AppRepositoryContract {
       await this.db.runAsync('UPDATE sessions SET status = ?, ended_at = ?, updated_at = ? WHERE id = ?', 'closed', at, at, session.id);
       await this.writeRevision('session', session.id, 'close_session', session, { ...session, status: 'closed', endedAt: at }, 'close', at);
     }
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   async deleteAllData(at = nowIso()): Promise<AppSnapshot> {
@@ -541,7 +552,7 @@ export class AppRepository implements AppRepositoryContract {
       await this.db.runAsync('DELETE FROM event_revisions');
       await this.writeRevision('app', 'all_data', 'delete_all_data', undefined, { deletedAt: at }, 'privacy_delete', at);
     });
-    return this.loadSnapshot();
+    return this.loadSnapshot(at);
   }
 
   private async seedDefaults(): Promise<void> {
@@ -582,6 +593,7 @@ export class AppRepository implements AppRepositoryContract {
   }
 
   private async ensureActiveSession(startedAt: string): Promise<ContractionSession> {
+    await this.closeStaleActiveSession(startedAt);
     const existing = await this.getActiveSession();
     if (existing) {
       return existing;
@@ -608,6 +620,33 @@ export class AppRepository implements AppRepositoryContract {
     return session;
   }
 
+  private async closeStaleActiveSession(at: string): Promise<void> {
+    const session = await this.getActiveSession();
+    if (!session) {
+      return;
+    }
+    const activeEvent = await this.db.getFirstAsync<EventRow>(
+      'SELECT * FROM contraction_events WHERE session_id = ? AND end_at IS NULL AND deleted_at IS NULL LIMIT 1',
+      session.id,
+    );
+    if (activeEvent) {
+      return;
+    }
+    const latestEnded = await this.db.getFirstAsync<EventRow>(
+      `SELECT * FROM contraction_events
+       WHERE session_id = ? AND end_at IS NOT NULL AND deleted_at IS NULL
+       ORDER BY end_at DESC LIMIT 1`,
+      session.id,
+    );
+    if (!shouldStartNewSessionAfterGap(latestEnded ? rowToEvent(latestEnded) : undefined, at)) {
+      return;
+    }
+    const endedAt = latestEnded!.end_at!;
+    const after: ContractionSession = { ...session, status: 'closed', endedAt, updatedAt: at };
+    await this.db.runAsync('UPDATE sessions SET status = ?, ended_at = ?, updated_at = ? WHERE id = ?', 'closed', endedAt, at, session.id);
+    await this.writeRevision('session', session.id, 'auto_close_session', session, after, 'auto_inactivity', at);
+  }
+
   private async getProfile(): Promise<PregnancyProfile> {
     const row = await this.db.getFirstAsync<ProfileRow>('SELECT * FROM pregnancy_profiles WHERE id = ?', DEFAULT_PROFILE_ID);
     if (!row) {
@@ -632,6 +671,11 @@ export class AppRepository implements AppRepositoryContract {
     return row ? rowToSession(row) : undefined;
   }
 
+  private async getSessions(): Promise<ContractionSession[]> {
+    const rows = await this.db.getAllAsync<SessionRow>('SELECT * FROM sessions ORDER BY started_at DESC');
+    return rows.map(rowToSession);
+  }
+
   private async getEvents(sessionId: string, includeDeleted = false): Promise<ContractionEvent[]> {
     const rows = await this.db.getAllAsync<EventRow>(
       `SELECT * FROM contraction_events WHERE session_id = ? ${includeDeleted ? '' : 'AND deleted_at IS NULL'} ORDER BY start_at ASC`,
@@ -640,10 +684,20 @@ export class AppRepository implements AppRepositoryContract {
     return rows.map(rowToEvent);
   }
 
+  private async getAllEvents(): Promise<ContractionEvent[]> {
+    const rows = await this.db.getAllAsync<EventRow>('SELECT * FROM contraction_events ORDER BY start_at ASC');
+    return rows.map(rowToEvent);
+  }
+
   private async getUrgentEvents(sessionId?: string): Promise<UrgentEvent[]> {
     const rows = sessionId
       ? await this.db.getAllAsync<UrgentRow>('SELECT * FROM urgent_events WHERE session_id = ? ORDER BY occurred_at DESC', sessionId)
       : await this.db.getAllAsync<UrgentRow>('SELECT * FROM urgent_events ORDER BY occurred_at DESC LIMIT 20');
+    return rows.map(rowToUrgent);
+  }
+
+  private async getAllUrgentEvents(): Promise<UrgentEvent[]> {
+    const rows = await this.db.getAllAsync<UrgentRow>('SELECT * FROM urgent_events ORDER BY occurred_at DESC');
     return rows.map(rowToUrgent);
   }
 

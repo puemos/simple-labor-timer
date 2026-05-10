@@ -115,6 +115,8 @@ export type PatternLabel =
   | 'inconsistent'
   | 'insufficient_data';
 
+export type TimerActivityState = 'idle' | 'measuring' | 'resting';
+
 export type ProviderRuleResult = {
   met: boolean;
   label: string;
@@ -131,6 +133,7 @@ export type UrgentRuleResult = {
 };
 
 export type SessionSummary = {
+  timerState: TimerActivityState;
   eventCount: number;
   activeEvent?: ContractionEvent;
   lastEvent?: ContractionEvent;
@@ -154,6 +157,10 @@ export type AppSnapshot = {
   profile: PregnancyProfile;
   providerRule?: ProviderRule;
   activeSession?: ContractionSession;
+  latestSession?: ContractionSession;
+  sessions: ContractionSession[];
   events: ContractionEvent[];
+  allEvents: ContractionEvent[];
   urgentEvents: UrgentEvent[];
+  allUrgentEvents: UrgentEvent[];
 };

@@ -19,6 +19,7 @@ type ContractionState = {
   now: string;
   snapshot?: AppSnapshot;
   hydrate: () => Promise<void>;
+  refresh: () => Promise<void>;
   tick: () => void;
   start: () => Promise<void>;
   end: () => Promise<void>;
@@ -70,6 +71,17 @@ export const useContractionStore = create<ContractionState>((set) => ({
       });
     }
   },
+  refresh: async () => {
+    try {
+      const repo = await getAppRepository();
+      set({ snapshot: await repo.loadSnapshot(), error: undefined, now: nowIso() });
+    } catch (caught) {
+      set({
+        now: nowIso(),
+        error: caught instanceof Error ? caught.message : 'The local database could not be refreshed.',
+      });
+    }
+  },
   tick: () => set({ now: nowIso() }),
   start: async () => {
     await hapticStart();
@@ -114,6 +126,8 @@ export function useContractionApp() {
   const error = useContractionStore((state) => state.error);
   const now = useContractionStore((state) => state.now);
   const snapshot = useContractionStore((state) => state.snapshot);
+  const activeSessionId = snapshot?.activeSession?.id;
+  const refresh = useContractionStore((state) => state.refresh);
   const actions = useContractionStore(
     useShallow((state) => ({
       reload: state.hydrate,
@@ -152,6 +166,12 @@ export function useContractionApp() {
       void hapticWarning();
     }
   }, [urgentRuleResult.active, urgentRuleResult.type]);
+
+  useEffect(() => {
+    if (!busy && activeSessionId && summary.timerState === 'idle') {
+      void refresh();
+    }
+  }, [activeSessionId, busy, refresh, summary.timerState]);
 
   const readAloudSummary = useMemo(() => {
     if (!snapshot) {
