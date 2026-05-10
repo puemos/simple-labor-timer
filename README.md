@@ -1,4 +1,4 @@
-# Contraction Timer
+# Simple Labor Timer
 
 Local-first contraction timer built with Expo, React Native, TypeScript, encrypted SQLite, and a deterministic timing/rules domain layer.
 
