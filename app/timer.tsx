@@ -25,6 +25,7 @@ import {
 } from '@/domain/timing/timeMath';
 import { ContractionEvent } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import {
   Body,
   Button,
@@ -40,6 +41,8 @@ import { Icons, ICON_STROKE_WIDTH } from '@/ui/icons';
 import { useTheme } from '@/ui/theme';
 
 export default function TimerRoute() {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, scheme, spacing, radii, shadows, typography } = useTheme();
   const { actions, busy, error, loading, now, providerRuleResult, snapshot, summary, urgentRuleResult } = useContractionApp();
   const insets = useSafeAreaInsets();
@@ -87,7 +90,7 @@ export default function TimerRoute() {
     return (
       <Screen>
         <View style={styles.centered}>
-          <Subhead color="secondary">Opening local timer…</Subhead>
+          <Subhead color="secondary">{t('timer.opening')}</Subhead>
         </View>
       </Screen>
     );
@@ -95,12 +98,12 @@ export default function TimerRoute() {
 
   if (!snapshot) {
     return (
-      <Screen largeTitle="Timer">
+      <Screen largeTitle={t('timer.title')}>
         <View style={{ paddingHorizontal: spacing.base }}>
           <Body color="secondary" style={{ marginBottom: spacing.base }}>
-            {error ?? 'The local timer could not be opened.'}
+            {error ?? t('timer.openFailed')}
           </Body>
-          <Button variant="filled" label="Retry" onPress={actions.reload} fullWidth />
+          <Button variant="filled" label={t('common.retry')} onPress={actions.reload} fullWidth />
         </View>
       </Screen>
     );
@@ -114,19 +117,19 @@ export default function TimerRoute() {
   const callRuleMet = showCurrentSessionDetails && providerRuleResult.met;
   const homeAlert = urgentActive
     ? {
-        accessibilityLabel: 'Urgent contact warning',
-        message: urgentRuleResult.message ?? 'A warning sign is active. Contact your care team now.',
+        accessibilityLabel: t('timer.urgentContactWarning'),
+        message: urgentRuleResult.message ?? t('timer.urgentWarningFallback'),
         onPress: () => router.push('/urgent'),
       }
     : callRuleMet
       ? {
-          accessibilityLabel: 'Saved call rule matched',
+          accessibilityLabel: t('timer.savedCallRuleMatched'),
           message: providerRuleResult.message,
           onPress: () => callNumber(snapshot.profile.careTeamPhone || snapshot.profile.birthLocationPhone),
         }
       : undefined;
-  const stateLabel = measuring ? 'Now timing' : presentingResting ? 'Resting' : 'Ready when you are';
-  const timerActionLabel = measuring ? 'End contraction' : 'Start contraction';
+  const stateLabel = measuring ? t('timer.stateNowTiming') : presentingResting ? t('timer.stateResting') : t('timer.stateReady');
+  const timerActionLabel = measuring ? t('timer.endContraction') : t('timer.startContraction');
   const badgeBg = measuring ? colors.contractionActive : colors.systemFill;
   const badgeColor = measuring ? colors.onContractionActive : colors.label;
   const heroBackground = measuring
@@ -142,10 +145,10 @@ export default function TimerRoute() {
     : presentingResting
       ? (summary.currentRestSeconds ?? 0)
       : 0;
-  const timerLabel = formatDuration(timerSeconds);
+  const timerLabel = formatDuration(timerSeconds, { t, locale });
   const rhythmRangeStartAt = snapshot.activeSession?.startedAt ?? currentSessionEvents[0]?.startAt;
   const rhythmSummary = buildRhythmSummary(currentSessionEvents, now, { rangeStartAt: rhythmRangeStartAt, rangeEndAt: now });
-  const rhythmStatus = rhythmStatusText(rhythmSummary.pattern);
+  const rhythmStatus = rhythmStatusText(rhythmSummary.pattern, { t, locale });
 
   return (
     <Screen
@@ -153,17 +156,17 @@ export default function TimerRoute() {
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <IconButton
             icon={Icons.Siren}
-            label="Urgent"
+            label={t('timer.urgent')}
             tone={urgentActive ? 'urgent' : 'neutral'}
             onPress={() => router.push('/urgent')}
           />
           <IconButton
             icon={Icons.Phone}
-            label="Call"
+            label={t('timer.call')}
             onPress={() => callNumber(snapshot.profile.careTeamPhone || snapshot.profile.birthLocationPhone)}
           />
-          <IconButton icon={Icons.Share2} label="Share" onPress={() => router.push('/share')} />
-          <IconButton icon={Icons.History} label="History" onPress={() => router.push('/history')} />
+          <IconButton icon={Icons.Share2} label={t('timer.share')} onPress={() => router.push('/share')} />
+          <IconButton icon={Icons.History} label={t('timer.history')} onPress={() => router.push('/history')} />
         </View>
       }
       headerRight={
@@ -171,13 +174,13 @@ export default function TimerRoute() {
           {resting ? (
             <IconButton
               icon={Icons.Flag}
-              label="Finish session"
+              label={t('timer.finishSession')}
               tone="neutral"
               onPress={actions.closeSession}
               disabled={busy}
             />
           ) : null}
-          <IconButton icon={Icons.Settings} label="Settings" onPress={() => router.push('/settings')} />
+          <IconButton icon={Icons.Settings} label={t('timer.settings')} onPress={() => router.push('/settings')} />
         </View>
       }
       scrollable
@@ -214,7 +217,7 @@ export default function TimerRoute() {
               <Icons.AlertTriangle color={colors.onUrgent} size={20} strokeWidth={2} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Headline color="onUrgent" numberOfLines={1}>
-                  Call now
+                  {t('timer.callNow')}
                 </Headline>
                 <Footnote color="onUrgent" style={styles.homeAlertBody} numberOfLines={2}>
                   {homeAlert.message}
@@ -228,7 +231,7 @@ export default function TimerRoute() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={timerActionLabel}
-          accessibilityHint="Toggles the contraction timer"
+          accessibilityHint={t('timer.toggleHint')}
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           onPress={handleTimerPress}
@@ -279,7 +282,7 @@ export default function TimerRoute() {
             </Animated.Text>
 
             <Subhead color="secondary" style={{ textAlign: 'center' }}>
-              {measuring ? 'Tap anywhere to end' : presentingResting ? 'Tap anywhere to start the next' : 'Tap anywhere to start timing'}
+              {measuring ? t('timer.tapToEnd') : presentingResting ? t('timer.tapToStartNext') : t('timer.tapToStart')}
             </Subhead>
 
             <View
@@ -301,8 +304,8 @@ export default function TimerRoute() {
         </Pressable>
 
         <View style={[styles.metrics, { gap: spacing.sm }]}>
-          <MetricTile label="Duration" value={formatShortDuration(lastDurationSeconds)} icon={Icons.Timer} />
-          <MetricTile label="Interval" value={formatShortDuration(lastIntervalSeconds)} icon={Icons.Clock} />
+          <MetricTile label={t('timer.duration')} value={formatShortDuration(lastDurationSeconds, { t, locale })} icon={Icons.Timer} />
+          <MetricTile label={t('timer.interval')} value={formatShortDuration(lastIntervalSeconds, { t, locale })} icon={Icons.Clock} />
         </View>
 
         <RhythmStatusControl
@@ -320,7 +323,7 @@ export default function TimerRoute() {
           <Button
             variant="plain"
             size="sm"
-            label="Undo last"
+            label={t('timer.undoLast')}
             leadingIcon={Icons.Undo2}
             onPress={actions.undo}
             disabled={busy}
@@ -343,6 +346,7 @@ function RhythmStatusControl({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const { t } = useAppTranslation();
   const { colors, radii, spacing } = useTheme();
   const isDisabled = Boolean(disabled);
 
@@ -362,7 +366,7 @@ function RhythmStatusControl({
         </View>
         <View style={styles.rhythmControlBody}>
           <Footnote color="secondary" numberOfLines={1}>
-            Rhythm
+            {t('timer.rhythm')}
           </Footnote>
           <Headline numberOfLines={1} style={styles.rhythmStatus}>
             {status}
@@ -380,8 +384,8 @@ function RhythmStatusControl({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Rhythm, ${status}`}
-      accessibilityHint="Opens rhythm details"
+      accessibilityLabel={`${t('timer.rhythm')}, ${status}`}
+      accessibilityHint={t('timer.rhythmHint')}
       onPress={() => {
         void hapticSelection();
         onPress();
@@ -394,6 +398,8 @@ function RhythmStatusControl({
 }
 
 function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; now: string }) {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, radii, spacing } = useTheme();
   const totalSessionSeconds = events.length > 0 ? secondsBetween(events[0].startAt, now) : 0;
   const isLatestActive = Boolean(events.at(-1) && !events.at(-1)!.endAt);
@@ -421,9 +427,9 @@ function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; n
         ]}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Headline numberOfLines={1}>Current session</Headline>
+          <Headline numberOfLines={1}>{t('timer.currentSession')}</Headline>
           <Footnote color="secondary" numberOfLines={1} style={styles.timelineHeaderMeta}>
-            {events.length} {events.length === 1 ? 'contraction' : 'contractions'} · {formatShortDuration(totalSessionSeconds)}
+            {events.length} {t('time.contraction', { count: events.length })} · {formatShortDuration(totalSessionSeconds, { t, locale })}
           </Footnote>
         </View>
         {isLatestActive ? (
@@ -439,7 +445,7 @@ function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; n
             ]}
           >
             <Footnote style={[styles.timelineHeaderBadgeLabel, { color: colors.onContractionActive }]}>
-              LIVE
+              {t('timer.live')}
             </Footnote>
           </View>
         ) : null}
@@ -479,14 +485,14 @@ function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; n
                       #{chronoIndex + 1}
                     </Subhead>
                     <Footnote color="tertiary" numberOfLines={1} style={styles.timelineInlineTime}>
-                      {formatTimeOnly(event.startAt)} – {event.endAt ? formatTimeOnly(event.endAt) : 'now'}
+                      {formatTimeOnly(event.startAt, { t, locale })} - {event.endAt ? formatTimeOnly(event.endAt, { t, locale }) : t('common.now')}
                     </Footnote>
                   </View>
                   <Footnote
                     numberOfLines={1}
                     style={[styles.timelineDuration, isActive && { color: colors.contractionActive }]}
                   >
-                    {formatShortDuration(eventDurationSeconds(event, now))}
+                    {formatShortDuration(eventDurationSeconds(event, now), { t, locale })}
                   </Footnote>
                 </View>
               </View>
@@ -508,10 +514,10 @@ function CurrentSessionTimeline({ events, now }: { events: ContractionEvent[]; n
                 </View>
                 <View style={styles.timelineRestBody}>
                   <Footnote color="secondary" style={styles.timelineRestLabel}>
-                    Rest
+                    {t('timer.rest')}
                   </Footnote>
                   <Footnote color="secondary" style={styles.timelineRestDuration}>
-                    {formatShortDuration(restGap)}
+                    {formatShortDuration(restGap, { t, locale })}
                   </Footnote>
                 </View>
               </View>

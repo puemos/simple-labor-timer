@@ -1,4 +1,5 @@
 import { ContractionEvent } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 
 export function nowIso(): string {
   return new Date().toISOString();
@@ -66,9 +67,9 @@ export function average(values: number[]): number | undefined {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-export function formatDuration(totalSeconds?: number): string {
+export function formatDuration(totalSeconds?: number, options?: LocaleFormatOptions): string {
   if (totalSeconds === undefined) {
-    return '--';
+    return resolveT(options)('common.emptyValue');
   }
   const safe = Math.max(0, Math.round(totalSeconds));
   const hours = Math.floor(safe / 3600);
@@ -81,20 +82,21 @@ export function formatDuration(totalSeconds?: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-export function formatShortDuration(totalSeconds?: number): string {
+export function formatShortDuration(totalSeconds?: number, options?: LocaleFormatOptions): string {
+  const t = resolveT(options);
   if (totalSeconds === undefined) {
-    return '--';
+    return t('common.emptyValue');
   }
   const safe = Math.max(0, Math.round(totalSeconds));
   const minutes = Math.floor(safe / 60);
   const seconds = safe % 60;
   if (minutes === 0) {
-    return `${seconds}s`;
+    return t('time.secondsShort', { count: seconds });
   }
   if (seconds === 0) {
-    return `${minutes}m`;
+    return t('time.minutesShort', { count: minutes });
   }
-  return `${minutes}m ${seconds}s`;
+  return t('time.minutesSecondsShort', { minutes, seconds });
 }
 
 export function minutesAgo(minutes: number, now = nowIso()): string {

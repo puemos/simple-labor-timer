@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { RhythmInsight, RhythmInsightTone } from '@/domain/timing/rhythm';
+import { useAppTranslation } from '@/i18n';
 import { Card } from '@/ui/components/Card';
 import { Callout, Caption1, Headline, Title3 } from '@/ui/components/Text';
 import { Icons, ICON_STROKE_WIDTH } from '@/ui/icons';
@@ -10,6 +11,7 @@ type RhythmDetailPanelProps = {
 };
 
 export function RhythmDetailPanel({ insight }: RhythmDetailPanelProps) {
+  const { t } = useAppTranslation();
   const { colors, radii, spacing } = useTheme();
   const tone = insightTone(insight.tone, colors);
   const Icon = insight.tone === 'urgent' ? Icons.AlertTriangle : Icons.Waves;
@@ -51,7 +53,7 @@ export function RhythmDetailPanel({ insight }: RhythmDetailPanelProps) {
           paddingVertical: spacing.sm,
         }}
       >
-        <Caption1 style={{ color: tone.actionLabel, fontWeight: '700', textTransform: 'uppercase' }}>Next</Caption1>
+        <Caption1 style={{ color: tone.actionLabel, fontWeight: '700', textTransform: 'uppercase' }}>{t('rhythm.next')}</Caption1>
         <Headline style={{ color: tone.actionLabel, marginTop: 2 }}>{insight.action}</Headline>
       </View>
     </Card>

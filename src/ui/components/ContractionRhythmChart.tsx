@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } fr
 import { buildRhythmSummary, DEFAULT_RHYTHM_WINDOW_MINUTES, type RhythmSummary } from '@/domain/timing/rhythm';
 import { formatTimeOnly } from '@/domain/timing/dateFormat';
 import { ContractionEvent, Intensity } from '@/domain/types';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { intensityColor } from '@/ui/components/intensity';
 import { Caption2, Footnote, Subhead } from '@/ui/components/Text';
 import { useTheme } from '@/ui/theme';
@@ -40,6 +41,8 @@ export function ContractionRhythmChart({
   rangeEndAt,
   height = 92,
 }: ContractionRhythmChartProps) {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, radii, spacing } = useTheme();
   const [trackWidth, setTrackWidth] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -115,9 +118,9 @@ export function ContractionRhythmChart({
           backgroundColor: colors.tertiarySystemFill,
         }}
       >
-        <Subhead style={{ textAlign: 'center', fontWeight: '600' }}>Need one more contraction</Subhead>
+        <Subhead style={{ textAlign: 'center', fontWeight: '600' }}>{t('rhythm.needOneMore')}</Subhead>
         <Footnote color="secondary" style={{ textAlign: 'center', marginTop: spacing.xs }}>
-          Rhythm appears after there are at least two contractions in this session.
+          {t('rhythm.needOneMoreBody')}
         </Footnote>
       </View>
     );
@@ -196,7 +199,7 @@ export function ContractionRhythmChart({
             const tickMs = summary.windowStartMs + ratio * windowSpanMs;
             return (
               <Caption2 key={i} color="tertiary" style={{ fontVariant: ['tabular-nums'] }}>
-                {formatTimeOnly(new Date(tickMs))}
+                {formatTimeOnly(new Date(tickMs), { t, locale })}
               </Caption2>
             );
           })}

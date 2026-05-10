@@ -1,6 +1,7 @@
 import { patternText } from '@/domain/timing/patternLabels';
 import { computeSessionSummary } from '@/domain/timing/summaries';
 import { formatDateOnly, formatTimeOnly } from '@/domain/timing/dateFormat';
+import { urgentTypeLabel } from '@/domain/rules/urgentRules';
 import {
   average,
   endedEvents,
@@ -17,8 +18,8 @@ import {
   PregnancyProfile,
   ProviderRuleResult,
   UrgentEvent,
-  UrgentType,
 } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 
 export type SummaryExportInput = {
   session?: ContractionSession;
@@ -31,65 +32,70 @@ export type SummaryExportInput = {
   appVersion: string;
   includeNotes: boolean;
   includeUrgentEvents: boolean;
-};
+} & LocaleFormatOptions;
 
 export function buildSummaryText(input: SummaryExportInput): string {
+  const t = resolveT(input);
   const { averageRestLast5Seconds, ended, sessionEnded, startedAt, summary, visible } = buildSummaryModel(input);
 
   const lines = [
-    'Contraction update',
-    `Recorded: ${formatRecordedDateTime(input.now)}`,
-    `Covers: ${input.rangeLabel}`,
+    t('export.title'),
+    t('export.recorded', { value: formatRecordedDateTime(input.now, input) }),
+    t('export.covers', { value: input.rangeLabel }),
     '',
-    'Summary',
-    `Started: ${startedAt ? formatShareDateTime(startedAt, input.now) : 'No contractions'}`,
-    `Contractions: ${formatContractionCount(summary.eventCount, Boolean(summary.activeEvent))}`,
-    `Pattern: ${patternText(summary.pattern)}`,
+    t('export.summary'),
+    t('export.started', { value: startedAt ? formatShareDateTime(startedAt, input.now, input) : t('export.noContractions') }),
+    t('export.contractions', { value: formatContractionCount(summary.eventCount, Boolean(summary.activeEvent), input) }),
+    t('export.pattern', { value: patternText(summary.pattern, input) }),
     '',
-    'Averages, last 5',
-    `Contraction: ${formatShortDuration(summary.averageDurationLast5Seconds)}`,
-    `Rest: ${formatShortDuration(averageRestLast5Seconds)}`,
-    `Frequency: ${formatShortDuration(summary.averageIntervalLast5Seconds)} start-to-start`,
+    t('export.averagesLast5'),
+    t('export.contractionLine', { value: formatShortDuration(summary.averageDurationLast5Seconds, input) }),
+    t('export.restLine', { value: formatShortDuration(averageRestLast5Seconds, input) }),
+    t('export.frequencyLine', {
+      value: formatShortDuration(summary.averageIntervalLast5Seconds, input),
+      suffix: t('time.startToStart'),
+    }),
   ];
 
-  lines.push('', 'Recent timings');
-  const timingBlocks = recentTimingBlocks(visible, input.now, input.includeNotes, sessionEnded);
+  lines.push('', t('export.recentTimings'));
+  const timingBlocks = recentTimingBlocks(visible, input.now, input.includeNotes, sessionEnded, input);
   if (timingBlocks.length) {
     lines.push(...timingBlocks);
   } else {
-    lines.push('No contractions recorded.');
+    lines.push(t('export.noContractionsRecorded'));
   }
 
-  lines.push('', 'Call rule', ...callRuleLines(input.providerRuleResult, input.profile));
+  lines.push('', t('export.callRule'), ...callRuleLines(input.providerRuleResult, input.profile, input));
 
-  const urgent = input.includeUrgentEvents ? urgentEventLines(input.urgentEvents, input.now) : [];
+  const urgent = input.includeUrgentEvents ? urgentEventLines(input.urgentEvents, input.now, input) : [];
   if (urgent.length) {
-    lines.push('', 'Urgent events', ...urgent);
+    lines.push('', t('export.urgentEvents'), ...urgent);
   }
 
   const edited = ended.filter((event) => event.manuallyEdited);
   if (edited.length) {
-    lines.push('', `Manual edits: ${edited.length} contraction record(s) edited`);
+    lines.push('', t('export.manualEdits', { count: edited.length }));
   }
 
-  lines.push('', 'Recorded by me in Contraction Timer.', 'Not medical advice.');
+  lines.push('', t('export.recordedByMe'), t('export.notMedicalAdvice'));
 
   return lines.join('\n');
 }
 
 export function buildSummaryPdfHtml(input: SummaryExportInput): string {
+  const t = resolveT(input);
   const { averageRestLast5Seconds, ended, sessionEnded, startedAt, summary, visible } = buildSummaryModel(input);
   const urgent = input.includeUrgentEvents ? input.urgentEvents : [];
   const editedCount = ended.filter((event) => event.manuallyEdited).length;
-  const callRule = callRuleModel(input.providerRuleResult, input.profile);
+  const callRule = callRuleModel(input.providerRuleResult, input.profile, input);
   const ruleClass = callRule.status === 'matched' ? 'status-good' : 'status-neutral';
   const timelineRows = visible.length
     ? visible.map((event, index) => pdfTimelineRow(event, visible[index + 1], input, sessionEnded)).join('')
-    : `<tr><td colspan="4" class="empty">No contractions recorded.</td></tr>`;
+    : `<tr><td colspan="4" class="empty">${escapeHtml(t('export.noContractionsRecorded'))}</td></tr>`;
   const urgentSection = urgent.length
-    ? `<section class="section"><h2>Urgent events</h2><div class="event-list">${urgent.map((event) => pdfUrgentEvent(event, input.now)).join('')}</div></section>`
+    ? `<section class="section"><h2>${escapeHtml(t('export.urgentEvents'))}</h2><div class="event-list">${urgent.map((event) => pdfUrgentEvent(event, input.now, input)).join('')}</div></section>`
     : '';
-  const editsNote = editedCount ? `<p class="quiet">Manual edits: ${editedCount} contraction record(s) edited.</p>` : '';
+  const editsNote = editedCount ? `<p class="quiet">${escapeHtml(t('export.manualEdits', { count: editedCount }))}</p>` : '';
 
   return `<!doctype html>
 <html>
@@ -259,39 +265,39 @@ export function buildSummaryPdfHtml(input: SummaryExportInput): string {
 <body>
   <main class="page">
     <header class="header">
-      <p class="eyebrow">Private share report</p>
-      <h1>Contraction update</h1>
+      <p class="eyebrow">${escapeHtml(t('export.privateShareReport'))}</p>
+      <h1>${escapeHtml(t('export.title'))}</h1>
       <div class="meta">
-        <div>Recorded: ${escapeHtml(formatRecordedDateTime(input.now))}</div>
-        <div>Covers: ${escapeHtml(input.rangeLabel)}</div>
+        <div>${escapeHtml(t('export.recorded', { value: formatRecordedDateTime(input.now, input) }))}</div>
+        <div>${escapeHtml(t('export.covers', { value: input.rangeLabel }))}</div>
       </div>
     </header>
 
-    <section class="cards" aria-label="At a glance">
-      ${pdfMetricCard('Contractions', formatContractionCount(summary.eventCount, Boolean(summary.activeEvent)))}
-      ${pdfMetricCard('Pattern', patternText(summary.pattern))}
-      ${pdfMetricCard('Started', startedAt ? formatShareDateTime(startedAt, input.now) : 'No contractions')}
-      ${pdfMetricCard('Call rule', callRule.statusLabel, ruleClass)}
+    <section class="cards" aria-label="${escapeHtml(t('export.atAGlance'))}">
+      ${pdfMetricCard(t('export.contractionsCard'), formatContractionCount(summary.eventCount, Boolean(summary.activeEvent), input))}
+      ${pdfMetricCard(t('export.pattern', { value: '' }).replace(/:\s*$/, ''), patternText(summary.pattern, input))}
+      ${pdfMetricCard(t('export.startedCard'), startedAt ? formatShareDateTime(startedAt, input.now, input) : t('export.noContractions'))}
+      ${pdfMetricCard(t('export.callRule'), callRule.statusLabel, ruleClass)}
     </section>
 
     <section class="section">
-      <h2>Last 5 averages</h2>
+      <h2>${escapeHtml(t('export.last5Averages'))}</h2>
       <div class="average-grid">
-        ${pdfAverage('Contraction', formatShortDuration(summary.averageDurationLast5Seconds))}
-        ${pdfAverage('Rest', formatShortDuration(averageRestLast5Seconds))}
-        ${pdfAverage('Frequency', `${formatShortDuration(summary.averageIntervalLast5Seconds)} start-to-start`)}
+        ${pdfAverage(t('export.contraction'), formatShortDuration(summary.averageDurationLast5Seconds, input))}
+        ${pdfAverage(t('export.rest'), formatShortDuration(averageRestLast5Seconds, input))}
+        ${pdfAverage(t('export.frequency'), `${formatShortDuration(summary.averageIntervalLast5Seconds, input)} ${t('time.startToStart')}`)}
       </div>
     </section>
 
     <section class="section">
-      <h2>Timeline</h2>
+      <h2>${escapeHtml(t('export.timeline'))}</h2>
       <table>
         <thead>
           <tr>
-            <th class="time">Time</th>
-            <th class="metric">Contraction</th>
-            <th class="metric">Rest after</th>
-            <th class="detail">Notes</th>
+            <th class="time">${escapeHtml(t('export.tableTime'))}</th>
+            <th class="metric">${escapeHtml(t('export.tableContraction'))}</th>
+            <th class="metric">${escapeHtml(t('export.tableRestAfter'))}</th>
+            <th class="detail">${escapeHtml(t('export.tableNotes'))}</th>
           </tr>
         </thead>
         <tbody>${timelineRows}</tbody>
@@ -299,18 +305,18 @@ export function buildSummaryPdfHtml(input: SummaryExportInput): string {
     </section>
 
     <section class="section">
-      <h2>Call rule</h2>
+      <h2>${escapeHtml(t('export.callRule'))}</h2>
       <p><span class="pill ${ruleClass}">${escapeHtml(callRule.statusLabel)}</span></p>
-      <p>Saved rule: ${escapeHtml(callRule.ruleLabel)}</p>
-      ${callRule.careTeam ? `<p>Care team: ${escapeHtml(callRule.careTeam)}</p>` : ''}
+      <p>${escapeHtml(t('export.savedRulePdf', { value: callRule.ruleLabel }))}</p>
+      ${callRule.careTeam ? `<p>${escapeHtml(t('export.careTeamPdf', { value: callRule.careTeam }))}</p>` : ''}
     </section>
 
     ${urgentSection}
     ${editsNote}
 
     <footer class="footer">
-      Files are generated locally. No upload, account, or share link is created.<br/>
-      Recorded by me in Contraction Timer. Not medical advice.
+      ${escapeHtml(t('export.filesLocal'))}<br/>
+      ${escapeHtml(t('export.recordedByMe'))} ${escapeHtml(t('export.notMedicalAdvice'))}
     </footer>
   </main>
 </body>
@@ -363,27 +369,28 @@ function pdfTimelineRow(
   input: SummaryExportInput,
   sessionEnded: boolean,
 ): string {
-  const notes = pdfDetailLines(event, input.includeNotes);
-  const rest = pdfRestValue(event, next, input.now, sessionEnded);
+  const notes = pdfDetailLines(event, input.includeNotes, input);
+  const rest = pdfRestValue(event, next, input.now, sessionEnded, input);
   return `<tr>
-    <td class="time">${escapeHtml(formatShareDateTime(event.startAt, input.now))}</td>
-    <td class="metric">${escapeHtml(formatContractionDuration(event, input.now))}</td>
+    <td class="time">${escapeHtml(formatShareDateTime(event.startAt, input.now, input))}</td>
+    <td class="metric">${escapeHtml(formatContractionDuration(event, input.now, input))}</td>
     <td class="metric">${escapeHtml(rest)}</td>
     <td class="detail">${notes || '<span class="quiet">-</span>'}</td>
   </tr>`;
 }
 
-function pdfDetailLines(event: ContractionEvent, includeNotes: boolean): string {
+function pdfDetailLines(event: ContractionEvent, includeNotes: boolean, options: LocaleFormatOptions): string {
+  const t = resolveT(options);
   if (!includeNotes) {
     return '';
   }
 
   const lines: string[] = [];
   if (event.intensity) {
-    lines.push(`Intensity: ${formatIntensity(event.intensity)}`);
+    lines.push(t('export.intensity', { value: formatIntensity(event.intensity, options) }));
   }
   if (event.note) {
-    lines.push(`Note: ${event.note}`);
+    lines.push(t('export.note', { value: event.note }));
   }
   return lines.map((line) => `<div class="detail-line">${escapeHtml(line)}</div>`).join('');
 }
@@ -393,26 +400,28 @@ function pdfRestValue(
   next: ContractionEvent | undefined,
   now: string,
   sessionEnded: boolean,
+  options: LocaleFormatOptions,
 ): string {
-  const [line] = restLines(event, next, now, sessionEnded);
-  return line ? line.replace(/^Rest: /, '') : '-';
+  const [line] = restLines(event, next, now, sessionEnded, options);
+  return line ? line.replace(/^.*?: /, '') : '-';
 }
 
-function pdfUrgentEvent(event: UrgentEvent, now: string): string {
-  const label = urgentTypeLabels[event.type] ?? event.type.replaceAll('_', ' ');
+function pdfUrgentEvent(event: UrgentEvent, now: string, options: LocaleFormatOptions): string {
+  const label = urgentTypeLabel(event.type, options);
   const note = event.note ? ` (${event.note})` : '';
-  return `<div class="event"><strong>${escapeHtml(formatShareDateTime(event.occurredAt, now))}</strong><br/>${escapeHtml(
+  return `<div class="event"><strong>${escapeHtml(formatShareDateTime(event.occurredAt, now, options))}</strong><br/>${escapeHtml(
     `${label}${note}`,
   )}</div>`;
 }
 
-function callRuleModel(result: ProviderRuleResult | undefined, profile: PregnancyProfile) {
-  if (!result || result.label === 'No saved call rule') {
+function callRuleModel(result: ProviderRuleResult | undefined, profile: PregnancyProfile, options: LocaleFormatOptions) {
+  const t = resolveT(options);
+  if (!result || result.ruleStatus === 'not_saved') {
     return {
       careTeam: profile.careTeamPhone,
-      ruleLabel: 'Not saved',
+      ruleLabel: t('export.notSavedTitle'),
       status: 'not_saved',
-      statusLabel: 'Not saved',
+      statusLabel: t('export.notSavedTitle'),
     };
   }
 
@@ -420,7 +429,7 @@ function callRuleModel(result: ProviderRuleResult | undefined, profile: Pregnanc
     careTeam: profile.careTeamPhone,
     ruleLabel: result.label,
     status: result.met ? 'matched' : 'not_matched',
-    statusLabel: result.met ? 'Matched' : 'Not matched',
+    statusLabel: result.met ? t('export.matchedTitle') : t('export.notMatchedTitle'),
   };
 }
 
@@ -429,16 +438,17 @@ function recentTimingBlocks(
   now: string,
   includeNotes: boolean,
   sessionEnded: boolean,
+  options: LocaleFormatOptions,
 ): string[] {
   return events.slice(-5).flatMap((event, index, recent) => {
     const globalIndex = events.length - recent.length + index;
     const next = events[globalIndex + 1];
     const block = [
       '',
-      formatShareDateTime(event.startAt, now),
-      `Contraction: ${formatContractionDuration(event, now)}`,
-      ...restLines(event, next, now, sessionEnded),
-      ...noteLines(event, includeNotes),
+      formatShareDateTime(event.startAt, now, options),
+      resolveT(options)('export.contractionLine', { value: formatContractionDuration(event, now, options) }),
+      ...restLines(event, next, now, sessionEnded, options),
+      ...noteLines(event, includeNotes, options),
     ];
     return block;
   });
@@ -449,97 +459,92 @@ function restLines(
   next: ContractionEvent | undefined,
   now: string,
   sessionEnded: boolean,
+  options: LocaleFormatOptions,
 ): string[] {
+  const t = resolveT(options);
   if (!event.endAt) {
     return [];
   }
 
   if (next) {
     const rest = eventRestGapSeconds(next, event);
-    return rest === undefined ? [] : [`Rest: ${formatShortDuration(rest)}`];
+    return rest === undefined ? [] : [t('export.restLine', { value: formatShortDuration(rest, options) })];
   }
 
-  const rest = formatShortDuration(secondsBetween(event.endAt, now));
-  return sessionEnded ? [`Rest: ${rest} until session ended`] : [`Rest: ongoing, ${rest} so far`];
+  const rest = formatShortDuration(secondsBetween(event.endAt, now), options);
+  return sessionEnded
+    ? [t('export.restLine', { value: t('time.restUntilSessionEnded', { duration: rest }) })]
+    : [t('export.restLine', { value: t('time.restOngoing', { duration: rest }) })];
 }
 
-function noteLines(event: ContractionEvent, includeNotes: boolean): string[] {
+function noteLines(event: ContractionEvent, includeNotes: boolean, options: LocaleFormatOptions): string[] {
+  const t = resolveT(options);
   if (!includeNotes) {
     return [];
   }
 
   const lines: string[] = [];
   if (event.intensity) {
-    lines.push(`Intensity: ${formatIntensity(event.intensity)}`);
+    lines.push(t('export.intensity', { value: formatIntensity(event.intensity, options) }));
   }
   if (event.note) {
-    lines.push(`Note: ${event.note}`);
+    lines.push(t('export.note', { value: event.note }));
   }
   return lines;
 }
 
-function urgentEventLines(events: UrgentEvent[], now: string): string[] {
+function urgentEventLines(events: UrgentEvent[], now: string, options: LocaleFormatOptions): string[] {
   return events.map((event) => {
-    const label = urgentTypeLabels[event.type] ?? event.type.replaceAll('_', ' ');
+    const label = urgentTypeLabel(event.type, options);
     const note = event.note ? ` (${event.note})` : '';
-    return `${formatShareDateTime(event.occurredAt, now)}: ${label}${note}`;
+    return `${formatShareDateTime(event.occurredAt, now, options)}: ${label}${note}`;
   });
 }
 
-function callRuleLines(result: ProviderRuleResult | undefined, profile: PregnancyProfile): string[] {
+function callRuleLines(result: ProviderRuleResult | undefined, profile: PregnancyProfile, options: LocaleFormatOptions): string[] {
+  const t = resolveT(options);
   const lines: string[] = [];
-  if (!result || result.label === 'No saved call rule') {
-    lines.push('Saved rule: not saved');
+  if (!result || result.ruleStatus === 'not_saved') {
+    lines.push(t('export.savedRule', { value: t('export.notSaved') }));
   } else {
-    lines.push(`Saved rule: ${result.label}`);
-    lines.push(`Status: ${result.met ? 'matched' : 'not matched'}`);
+    lines.push(t('export.savedRule', { value: result.label }));
+    lines.push(t('export.status', { value: result.met ? t('export.matched') : t('export.notMatched') }));
   }
 
   if (profile.careTeamPhone) {
-    lines.push(`Care team: ${profile.careTeamPhone}`);
+    lines.push(t('export.careTeam', { value: profile.careTeamPhone }));
   }
 
   return lines;
 }
 
-function formatContractionCount(count: number, hasActiveEvent: boolean): string {
+function formatContractionCount(count: number, hasActiveEvent: boolean, options: LocaleFormatOptions): string {
   if (!hasActiveEvent) {
     return String(count);
   }
-  return `${count} completed, 1 in progress`;
+  return resolveT(options)('time.completedInProgress', { completed: count, active: 1 });
 }
 
-function formatContractionDuration(event: ContractionEvent, now: string): string {
-  const duration = formatShortDuration(eventDurationSeconds(event, now));
-  return event.endAt ? duration : `${duration} so far`;
+function formatContractionDuration(event: ContractionEvent, now: string, options: LocaleFormatOptions): string {
+  const duration = formatShortDuration(eventDurationSeconds(event, now), options);
+  return event.endAt ? duration : resolveT(options)('time.soFar', { duration });
 }
 
-function formatShareDateTime(value: string, now: string): string {
-  if (formatDateOnly(value) === formatDateOnly(now)) {
-    return formatTimeOnly(value);
+function formatShareDateTime(value: string, now: string, options: LocaleFormatOptions): string {
+  if (formatDateOnly(value, options) === formatDateOnly(now, options)) {
+    return formatTimeOnly(value, options);
   }
-  return `${formatDateOnly(value)}, ${formatTimeOnly(value)}`;
+  return `${formatDateOnly(value, options)}, ${formatTimeOnly(value, options)}`;
 }
 
-function formatRecordedDateTime(value: string): string {
-  return `${formatDateOnly(value)}, ${formatTimeOnly(value)}`;
+function formatRecordedDateTime(value: string, options: LocaleFormatOptions): string {
+  return `${formatDateOnly(value, options)}, ${formatTimeOnly(value, options)}`;
 }
 
-function formatIntensity(intensity: Intensity): string {
-  return intensity.replaceAll('_', ' ');
+function formatIntensity(intensity: Intensity, options: LocaleFormatOptions): string {
+  return resolveT(options)(`intensity.${intensity}`);
 }
 
 function escapeHtml(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
-
-const urgentTypeLabels: Record<UrgentType, string> = {
-  water_broke: 'Waters broke',
-  vaginal_bleeding: 'Vaginal bleeding',
-  reduced_fetal_movement: 'Baby moving less than usual',
-  under_37_weeks_labor_concern: 'Under 37 weeks and labor concern',
-  contraction_over_2_min: 'Contraction over 2 minutes',
-  severe_or_unusual_pain: 'Severe or unusual pain',
-  fever_unwell: 'Fever or feeling very unwell',
-  planned_c_section_or_call_early: 'Planned C-section or call early',
-};

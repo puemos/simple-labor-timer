@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Wehen-Timer",
+  "NSFaceIDUsageDescription": "Erlaube Wehen-Timer den Zugriff auf deine Face ID-Biometriedaten.",
+  "NSMicrophoneUsageDescription": ""
+}

@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "진통 타이머",
+  "NSFaceIDUsageDescription": "진통 타이머가 Face ID 생체 인식 데이터에 접근하도록 허용합니다.",
+  "NSMicrophoneUsageDescription": ""
+}

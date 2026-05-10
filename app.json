@@ -37,6 +37,19 @@
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
+    "locales": {
+      "en": "./locales/en.json",
+      "it": "./locales/it.json",
+      "fr": "./locales/fr.json",
+      "es": "./locales/es.json",
+      "de": "./locales/de.json",
+      "pt-BR": "./locales/pt-BR.json",
+      "zh-Hans": "./locales/zh-Hans.json",
+      "ja": "./locales/ja.json",
+      "ko": "./locales/ko.json",
+      "ar": "./locales/ar.json",
+      "hi": "./locales/hi.json"
+    },
     "plugins": [
       "expo-router",
       [
@@ -51,8 +64,45 @@
           "configureAndroidBackup": false
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "it",
+              "fr",
+              "es",
+              "de",
+              "pt-BR",
+              "zh-Hans",
+              "ja",
+              "ko",
+              "ar",
+              "hi"
+            ],
+            "android": [
+              "en",
+              "it",
+              "fr",
+              "es",
+              "de",
+              "pt-BR",
+              "zh-Hans",
+              "ja",
+              "ko",
+              "ar",
+              "hi"
+            ]
+          }
+        }
+      ]
     ],
+    "extra": {
+      "supportsRTL": true
+    },
     "experiments": {
       "typedRoutes": true
     }

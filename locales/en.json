@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Simple Labor Timer",
+  "NSFaceIDUsageDescription": "Allow Simple Labor Timer to access your Face ID biometric data.",
+  "NSMicrophoneUsageDescription": ""
+}

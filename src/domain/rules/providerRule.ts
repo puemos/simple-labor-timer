@@ -1,16 +1,20 @@
 import { endedEvents, eventDurationSeconds, eventIntervalSeconds, parseIso } from '@/domain/timing/timeMath';
 import { ContractionEvent, ProviderRule, ProviderRuleResult } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 
 export function evaluateProviderRule(
   events: ContractionEvent[],
   rule: ProviderRule | undefined,
   now: string,
+  options?: LocaleFormatOptions,
 ): ProviderRuleResult {
+  const t = resolveT(options);
   if (!rule) {
     return {
       met: false,
-      label: 'No saved call rule',
-      message: 'No saved call rule is active.',
+      label: t('rules.noSavedRuleLabel'),
+      message: t('rules.noSavedRuleMessage'),
+      ruleStatus: 'not_saved',
       sourceIds: [],
       matchedEventIds: [],
     };
@@ -21,7 +25,8 @@ export function evaluateProviderRule(
     return {
       met: false,
       label: rule.label,
-      message: 'More contractions are needed before checking this rule.',
+      message: t('rules.moreNeeded'),
+      ruleStatus: 'insufficient_data',
       sourceIds: ['S2', 'S4'],
       matchedEventIds: [],
     };
@@ -46,9 +51,8 @@ export function evaluateProviderRule(
   return {
     met,
     label: rule.label,
-    message: met
-      ? 'This matches your saved call rule. Contact your care team.'
-      : 'This has not matched your saved call rule yet.',
+    message: met ? t('rules.matched') : t('rules.notMatched'),
+    ruleStatus: met ? 'matched' : 'not_matched',
     sourceIds: ['S2', 'S4'],
     matchedEventIds: met ? inWindow.map((event) => event.id) : [],
   };

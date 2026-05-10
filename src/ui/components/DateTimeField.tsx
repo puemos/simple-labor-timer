@@ -9,6 +9,7 @@ import {
   formatCompactDateTime,
   formatEditableDateTime,
 } from '@/domain/timing/dateFormat';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { Body, Footnote } from '@/ui/components/Text';
 import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
@@ -20,6 +21,8 @@ type DateTimeFieldProps = {
 };
 
 export function DateTimeField({ label, value, onChangeText }: DateTimeFieldProps) {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, radii, scheme, spacing } = useTheme();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [draftDate, setDraftDate] = useState(() => dateTimeInputValueToDate(value));
@@ -90,17 +93,17 @@ export function DateTimeField({ label, value, onChangeText }: DateTimeFieldProps
       </Footnote>
       {Platform.OS === 'android' ? (
         <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={openAndroidPicker} style={fieldStyle}>
-          <Body>{formatCompactDateTime(selectedDate)}</Body>
+          <Body>{formatCompactDateTime(selectedDate, { t, locale })}</Body>
         </Pressable>
       ) : (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
-          accessibilityHint="Opens date and time picker"
+          accessibilityHint={t('common.dateTimePickerHint')}
           onPress={openIosPicker}
           style={fieldStyle}
         >
-          <Body>{formatCompactDateTime(selectedDate)}</Body>
+          <Body>{formatCompactDateTime(selectedDate, { t, locale })}</Body>
         </Pressable>
       )}
       {Platform.OS === 'ios' ? (
@@ -119,8 +122,8 @@ export function DateTimeField({ label, value, onChangeText }: DateTimeFieldProps
             ]}
           >
             <View style={styles.actions}>
-              <Button variant="plain" label="Cancel" onPress={() => setPickerOpen(false)} />
-              <Button variant="plain" label="Done" onPress={commitIosPicker} />
+              <Button variant="plain" label={t('common.cancel')} onPress={() => setPickerOpen(false)} />
+              <Button variant="plain" label={t('common.done')} onPress={commitIosPicker} />
             </View>
             <DateTimePicker
               value={draftDate}

@@ -2,14 +2,17 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { I18nProvider } from '@/i18n';
 import { useContractionBootstrap } from '@/state/useContractionStore';
 import { ThemeProvider, useTheme } from '@/ui/theme';
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <RootShell />
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <RootShell />
+      </ThemeProvider>
+    </I18nProvider>
   );
 }
 

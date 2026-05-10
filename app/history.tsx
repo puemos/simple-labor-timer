@@ -7,6 +7,7 @@ import { formatEditableDateTime, formatTimeOnly, normalizeDateTimeToIso } from '
 import { buildRhythmSummary } from '@/domain/timing/rhythm';
 import { eventDurationSeconds, eventIntervalSeconds, eventRestGapSeconds, formatShortDuration, visibleEvents } from '@/domain/timing/timeMath';
 import { ContractionEvent, ContractionSession } from '@/domain/types';
+import { AppT, useAppLanguage, useAppTranslation } from '@/i18n';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Button,
@@ -36,10 +37,12 @@ type SessionBucket = {
 };
 
 export default function HistoryRoute() {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, spacing } = useTheme();
   const { actions, busy, now, snapshot } = useContractionApp();
   const events = useMemo(() => visibleEvents(snapshot?.allEvents ?? []), [snapshot?.allEvents]);
-  const buckets = useMemo(() => groupBySession(snapshot?.sessions ?? [], events), [events, snapshot?.sessions]);
+  const buckets = useMemo(() => groupBySession(snapshot?.sessions ?? [], events, { t, locale }), [events, locale, snapshot?.sessions, t]);
   const rhythmSession = snapshot?.activeSession ?? snapshot?.latestSession;
   const rhythmEvents = useMemo(
     () => (rhythmSession ? events.filter((event) => event.sessionId === rhythmSession.id) : []),
@@ -56,25 +59,25 @@ export default function HistoryRoute() {
     <Screen
       scrollable
       background="grouped"
-      largeTitle="History"
+      largeTitle={t('history.title')}
       headerLeft={
-        <IconButton icon={Icons.ChevronLeft} label="Back" onPress={() => router.back()} />
+        <IconButton icon={Icons.ChevronLeft} label={t('common.back')} onPress={() => router.back()} />
       }
       headerRight={
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <IconButton icon={Icons.RotateCcw} label="Restore last deleted" onPress={actions.restore} />
-          <IconButton icon={Icons.Plus} label="Add missed contraction" onPress={() => setMissedOpen(true)} />
+          <IconButton icon={Icons.RotateCcw} label={t('history.restoreLastDeleted')} onPress={actions.restore} />
+          <IconButton icon={Icons.Plus} label={t('history.addMissedContraction')} onPress={() => setMissedOpen(true)} />
         </View>
       }
     >
       {rhythmEvents.length > 0 && rhythmSession ? (
         <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.lg }}>
           <RhythmSummaryRow
-            title="Latest rhythm"
+            title={t('history.latestRhythm')}
             summary={rhythmSummary}
             disabled={rhythmSummary.eventCount < 2}
             background="grouped"
-            sourceLabel="Session"
+            sourceLabel={t('time.session')}
             onPress={() =>
               router.push({
                 pathname: '/rhythm',
@@ -88,8 +91,8 @@ export default function HistoryRoute() {
       {events.length === 0 ? (
         <EmptyState
           icon={Icons.History}
-          title="No contractions yet"
-          body="Once you've ended a contraction, it'll appear here for review."
+          title={t('history.noContractionsTitle')}
+          body={t('history.noContractionsBody')}
         />
       ) : (
         buckets.flatMap((session) =>
@@ -104,16 +107,16 @@ export default function HistoryRoute() {
                 <SwipeableRow
                   key={event.id}
                   onDelete={() =>
-                    Alert.alert('Delete contraction?', 'You can restore the most recent deletion from History.', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => actions.deleteEvent(event.id) },
+                    Alert.alert(t('history.deleteContractionTitle'), t('history.deleteContractionBody'), [
+                      { text: t('common.cancel'), style: 'cancel' },
+                      { text: t('common.delete'), style: 'destructive', onPress: () => actions.deleteEvent(event.id) },
                     ])
                   }
                   onEdit={() => router.push({ pathname: '/history/[id]', params: { id: event.id } })}
                 >
                   <ListRow
-                    title={`#${index + 1} · ${formatTime(event.startAt)}`}
-                    subtitle={buildSubtitle(event, previous, now)}
+                    title={`#${index + 1} · ${formatTime(event.startAt, { t, locale })}`}
+                    subtitle={buildSubtitle(event, previous, now, { t, locale })}
                     trailing="chevron"
                     onPress={() => router.push({ pathname: '/history/[id]', params: { id: event.id } })}
                   />
@@ -138,7 +141,7 @@ export default function HistoryRoute() {
       {events.length > 0 ? (
         <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.sm }}>
           <Subhead color="secondary" style={{ textAlign: 'center' }}>
-            {events.length} {events.length === 1 ? 'contraction' : 'contractions'} total
+            {t('time.contractionsTotal', { count: events.length })}
           </Subhead>
         </View>
       ) : null}
@@ -159,6 +162,7 @@ function MissedSheet({
   onAdd: (startIso: string, endIso: string) => Promise<void>;
   busy: boolean;
 }) {
+  const { t } = useAppTranslation();
   const { colors, spacing } = useTheme();
   const defaults = useMemo(() => {
     const end = formatEditableDateTime(Date.now() - 60_000);
@@ -177,14 +181,14 @@ function MissedSheet({
         gap: spacing.sm,
       }}
     >
-      <Headline>Add missed contraction</Headline>
-      <DateTimeField label="Start" value={start} onChangeText={setStart} />
-      <DateTimeField label="End" value={end} onChangeText={setEnd} />
+      <Headline>{t('history.addMissedTitle')}</Headline>
+      <DateTimeField label={t('history.start')} value={start} onChangeText={setStart} />
+      <DateTimeField label={t('history.end')} value={end} onChangeText={setEnd} />
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <Button variant="gray" label="Cancel" onPress={onClose} fullWidth style={{ flex: 1 }} />
+        <Button variant="gray" label={t('common.cancel')} onPress={onClose} fullWidth style={{ flex: 1 }} />
         <Button
           variant="filled"
-          label="Add"
+          label={t('common.add')}
           loading={busy}
           onPress={() => onAdd(normalizeDateTimeToIso(start), normalizeDateTimeToIso(end))}
           fullWidth
@@ -246,7 +250,11 @@ function SwipeableRow({
   );
 }
 
-function groupBySession(sessions: ContractionSession[], events: ContractionEvent[]): SessionBucket[] {
+function groupBySession(
+  sessions: ContractionSession[],
+  events: ContractionEvent[],
+  options: { t: AppT; locale: string },
+): SessionBucket[] {
   const knownSessions = sessions.filter((session) => events.some((event) => event.sessionId === session.id));
   const missingSessions = Array.from(new Set(events.map((event) => event.sessionId)))
     .filter((sessionId) => !knownSessions.some((session) => session.id === sessionId))
@@ -266,13 +274,13 @@ function groupBySession(sessions: ContractionSession[], events: ContractionEvent
     const sessionEvents = events.filter((event) => event.sessionId === session.id);
     return {
       key: session.id,
-      label: formatSessionLabel(session, sessionEvents),
-      days: groupByDay(sessionEvents),
+      label: formatSessionLabel(session, sessionEvents, options),
+      days: groupByDay(sessionEvents, options),
     };
   });
 }
 
-function groupByDay(events: ContractionEvent[]): DayBucket[] {
+function groupByDay(events: ContractionEvent[], options: { t: AppT; locale: string }): DayBucket[] {
   const reversed = [...events].reverse();
   const today = startOfLocalDay(new Date());
   const yesterday = startOfLocalDay(new Date(today.getTime() - 86_400_000));
@@ -286,11 +294,11 @@ function groupByDay(events: ContractionEvent[]): DayBucket[] {
     const key = day.toDateString();
     let label: string;
     if (day.getTime() === today.getTime()) {
-      label = 'Today';
+      label = options.t('time.today');
     } else if (day.getTime() === yesterday.getTime()) {
-      label = 'Yesterday';
+      label = options.t('time.yesterday');
     } else {
-      label = day.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      label = day.toLocaleDateString(options.locale, { weekday: 'long', month: 'short', day: 'numeric' });
     }
     let bucket = map.get(key);
     if (!bucket) {
@@ -302,26 +310,30 @@ function groupByDay(events: ContractionEvent[]): DayBucket[] {
   return Array.from(map.values());
 }
 
-function formatSessionLabel(session: ContractionSession, events: ContractionEvent[]): string {
+function formatSessionLabel(
+  session: ContractionSession,
+  events: ContractionEvent[],
+  options: { t: AppT; locale: string },
+): string {
   if (session.status === 'active') {
-    return 'Current session';
+    return options.t('time.currentSession');
   }
   const count = events.length;
   const endAt = session.endedAt ?? events.at(-1)?.endAt ?? events.at(-1)?.startAt;
   const start = new Date(session.startedAt);
   const end = endAt ? new Date(endAt) : undefined;
   const range = end
-    ? `${formatSessionEndpoint(start, true)} - ${formatSessionEndpoint(end, !sameLocalDay(start, end))}`
-    : formatSessionEndpoint(start, true);
-  return `${range} · ${count} ${count === 1 ? 'contraction' : 'contractions'}`;
+    ? `${formatSessionEndpoint(start, true, options)} - ${formatSessionEndpoint(end, !sameLocalDay(start, end), options)}`
+    : formatSessionEndpoint(start, true, options);
+  return `${range} · ${count} ${options.t('time.contraction', { count })}`;
 }
 
-function formatSessionEndpoint(date: Date, includeDate: boolean): string {
-  const time = formatTimeOnly(date);
+function formatSessionEndpoint(date: Date, includeDate: boolean, options: { t: AppT; locale: string }): string {
+  const time = formatTimeOnly(date, options);
   if (!includeDate) {
     return time;
   }
-  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+  return `${date.toLocaleDateString(options.locale, { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 function sameLocalDay(first: Date, second: Date): boolean {
@@ -334,13 +346,18 @@ function startOfLocalDay(date: Date): Date {
   return local;
 }
 
-function formatTime(iso: string): string {
-  return formatTimeOnly(iso);
+function formatTime(iso: string, options: { t: AppT; locale: string }): string {
+  return formatTimeOnly(iso, options);
 }
 
-function buildSubtitle(event: ContractionEvent, previous: ContractionEvent | undefined, now: string): string {
-  const duration = formatShortDuration(eventDurationSeconds(event, now));
-  const interval = formatShortDuration(eventIntervalSeconds(event, previous));
-  const rest = formatShortDuration(eventRestGapSeconds(event, previous));
+function buildSubtitle(
+  event: ContractionEvent,
+  previous: ContractionEvent | undefined,
+  now: string,
+  options: { t: AppT; locale: string },
+): string {
+  const duration = formatShortDuration(eventDurationSeconds(event, now), options);
+  const interval = formatShortDuration(eventIntervalSeconds(event, previous), options);
+  const rest = formatShortDuration(eventRestGapSeconds(event, previous), options);
   return `${duration} · ${interval} · ${rest}`;
 }

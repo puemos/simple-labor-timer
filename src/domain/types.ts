@@ -121,6 +121,7 @@ export type ProviderRuleResult = {
   met: boolean;
   label: string;
   message: string;
+  ruleStatus: 'not_saved' | 'insufficient_data' | 'matched' | 'not_matched';
   sourceIds: string[];
   matchedEventIds: string[];
 };

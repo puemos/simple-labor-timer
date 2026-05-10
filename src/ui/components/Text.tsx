@@ -1,5 +1,6 @@
 import { ComponentProps } from 'react';
 import { Text as RNText, StyleProp, TextStyle } from 'react-native';
+import { useAppLanguage } from '@/i18n';
 import { useTheme } from '@/ui/theme';
 import { TypographyVariant } from '@/ui/theme/typography';
 
@@ -37,8 +38,9 @@ function useTextColor(color: TextColor): string {
 
 function AppText({ variant = 'body', color = 'default', style, ...rest }: AppTextProps) {
   const { typography } = useTheme();
+  const { isRTL } = useAppLanguage();
   const resolvedColor = useTextColor(color);
-  return <RNText {...rest} style={[typography[variant], { color: resolvedColor }, style]} />;
+  return <RNText {...rest} style={[typography[variant], { color: resolvedColor, writingDirection: isRTL ? 'rtl' : 'ltr' }, style]} />;
 }
 
 function makeVariant(variant: TypographyVariant) {

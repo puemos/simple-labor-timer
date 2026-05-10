@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Minuteur contractions",
+  "NSFaceIDUsageDescription": "Autorisez Minuteur contractions à accéder à vos données biométriques Face ID.",
+  "NSMicrophoneUsageDescription": ""
+}

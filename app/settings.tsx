@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Switch, View } from 'react-native';
 import { hapticSelection } from '@/native/haptics';
 import { CONTENT_VERSION } from '@/domain/appConstants';
+import { AppT, LanguagePreference, languageOptions, useAppLanguage, useAppTranslation } from '@/i18n';
 import {
   applyMockContractionScenario,
   MOCK_CONTRACTION_SCENARIOS,
@@ -23,10 +24,10 @@ import {
 import { Icons } from '@/ui/icons';
 import { ThemePreference, useTheme } from '@/ui/theme';
 
-const themeOptions: { key: ThemePreference; label: string }[] = [
-  { key: 'system', label: 'System' },
-  { key: 'light', label: 'Light' },
-  { key: 'dark', label: 'Dark' },
+const themeOptions: { key: ThemePreference; labelKey: string }[] = [
+  { key: 'system', labelKey: 'common.system' },
+  { key: 'light', labelKey: 'common.light' },
+  { key: 'dark', labelKey: 'common.dark' },
 ];
 
 const rulePresets: { label: string; intervalMinutes: string }[] = [
@@ -37,7 +38,9 @@ const rulePresets: { label: string; intervalMinutes: string }[] = [
 ];
 
 export default function SettingsRoute() {
-  const { colors, scheme, spacing, preference, setPreference } = useTheme();
+  const { t } = useAppTranslation();
+  const { locale, preference: languagePreference, setPreference: setLanguagePreference } = useAppLanguage();
+  const { colors, scheme, spacing, preference: themePreference, setPreference: setThemePreference } = useTheme();
   const { actions, snapshot } = useContractionApp();
 
   const [profile, setProfile] = useState({
@@ -56,7 +59,7 @@ export default function SettingsRoute() {
     intervalMinutes: '5',
     durationSeconds: '60',
     windowMinutes: '60',
-    actionText: 'Call your care team',
+    actionText: t('settings.callCareTeamAction'),
   });
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function SettingsRoute() {
       doulaName: snapshot.profile.doulaName ?? '',
       doulaPhone: snapshot.profile.doulaPhone ?? '',
       emergencyPhone: snapshot.profile.emergencyPhone,
-      estimatedDueDate: formatDateOnly(snapshot.profile.estimatedDueDate),
+      estimatedDueDate: formatDateOnly(snapshot.profile.estimatedDueDate, { t, locale }),
       gestationalWeeks:
         snapshot.profile.gestationalAgeAtSetupDays !== undefined
           ? String(Math.floor(snapshot.profile.gestationalAgeAtSetupDays / 7))
@@ -84,7 +87,7 @@ export default function SettingsRoute() {
         actionText: snapshot.providerRule.actionText,
       });
     }
-  }, [snapshot]);
+  }, [locale, snapshot, t]);
 
   async function commitProfile(patch: Partial<typeof profile>) {
     const next = { ...profile, ...patch };
@@ -112,7 +115,7 @@ export default function SettingsRoute() {
       intervalSecondsMax: Math.max(1, Number(next.intervalMinutes) || 5) * 60,
       durationSecondsMin: Math.max(1, Number(next.durationSeconds) || 60),
       observationWindowMinutes: Math.max(1, Number(next.windowMinutes) || 60),
-      actionText: next.actionText.trim() || 'Call your care team',
+      actionText: next.actionText.trim() || t('settings.callCareTeamAction'),
       source: 'user_provider',
     });
   }
@@ -136,12 +139,12 @@ export default function SettingsRoute() {
     const scenario = MOCK_CONTRACTION_SCENARIOS.find((item) => item.key === scenarioKey);
     if (!scenario) return;
     Alert.alert(
-      'Load mock data?',
-      `This replaces local app data with the "${scenario.name}" scenario.`,
+      t('settings.loadMockTitle'),
+      t('settings.loadMockBody', { name: scenario.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Load',
+          text: t('common.load'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -149,8 +152,8 @@ export default function SettingsRoute() {
               await actions.reload();
             } catch (caught) {
               Alert.alert(
-                'Mock data failed',
-                caught instanceof Error ? caught.message : 'The mock scenario could not be loaded.',
+                t('settings.mockFailedTitle'),
+                caught instanceof Error ? caught.message : t('settings.mockFailedBody'),
               );
             }
           },
@@ -166,63 +169,69 @@ export default function SettingsRoute() {
     <Screen
       scrollable
       background="grouped"
-      largeTitle="Settings"
-      headerLeft={<IconButton icon={Icons.ChevronLeft} label="Back" onPress={() => router.back()} />}
+      largeTitle={t('settings.title')}
+      headerLeft={<IconButton icon={Icons.ChevronLeft} label={t('common.back')} onPress={() => router.back()} />}
     >
-      <ListSection header="Appearance">
+      <ListSection header={t('settings.appearance')}>
         <ListRow
-          title="Theme"
-          value={themeOptions.find((option) => option.key === preference)?.label}
+          title={t('settings.theme')}
+          value={t(themeOptions.find((option) => option.key === themePreference)?.labelKey ?? 'common.system')}
           trailing="value"
-          onPress={() => showThemePicker(preference, setPreference)}
+          onPress={() => showThemePicker(themePreference, setThemePreference, t)}
+        />
+        <ListRow
+          title={t('language.title')}
+          value={t(languageOptions.find((option) => option.key === languagePreference)?.labelKey ?? 'language.system')}
+          trailing="value"
+          onPress={() => showLanguagePicker(languagePreference, setLanguagePreference, t)}
         />
       </ListSection>
 
-      <ListSection header="Care team" footer="Tap-to-call uses the first available number from this list.">
+      <ListSection header={t('settings.careTeam')} footer={t('settings.careTeamFooter')}>
         <PhoneRow
-          title="Care team"
+          title={t('settings.careTeam')}
           value={profile.careTeamPhone}
           onCommit={(careTeamPhone) => commitProfile({ careTeamPhone })}
         />
         <PhoneRow
-          title="Birth location"
+          title={t('settings.birthLocation')}
           value={profile.birthLocationPhone}
           onCommit={(birthLocationPhone) => commitProfile({ birthLocationPhone })}
         />
         <PhoneRow
-          title="Doula name"
+          title={t('settings.doulaName')}
           value={profile.doulaName}
           keyboard="default"
           onCommit={(doulaName) => commitProfile({ doulaName })}
         />
         <PhoneRow
-          title="Doula phone"
+          title={t('settings.doulaPhone')}
           value={profile.doulaPhone}
           onCommit={(doulaPhone) => commitProfile({ doulaPhone })}
         />
         <PhoneRow
-          title="Emergency"
+          title={t('settings.emergency')}
           value={profile.emergencyPhone}
           onCommit={(emergencyPhone) => commitProfile({ emergencyPhone })}
         />
       </ListSection>
 
-      <ListSection header="Pregnancy">
+      <ListSection header={t('settings.pregnancy')}>
         <PhoneRow
-          title="Due date"
+          title={t('settings.dueDate')}
           value={profile.estimatedDueDate}
-          placeholder="May 10, 2026"
+          placeholder={t('settings.dueDatePlaceholder')}
           keyboard="default"
           onCommit={(estimatedDueDate) => commitProfile({ estimatedDueDate })}
         />
         <PhoneRow
-          title="Gestational weeks"
+          title={t('settings.gestationalWeeks')}
           value={profile.gestationalWeeks}
           keyboard="number-pad"
           onCommit={(gestationalWeeks) => commitProfile({ gestationalWeeks })}
         />
         <ListRow
-          title="High risk or call early"
+          title={t('settings.highRiskOrCallEarly')}
           trailing={
             <Switch
               value={profile.highRiskOrCallEarly}
@@ -233,7 +242,7 @@ export default function SettingsRoute() {
           }
         />
         <ListRow
-          title="Planned C-section"
+          title={t('settings.plannedCSection')}
           trailing={
             <Switch
               value={profile.plannedCesarean}
@@ -246,42 +255,42 @@ export default function SettingsRoute() {
       </ListSection>
 
       <ListSection
-        header="Call rule"
-        footer="Common guidelines to confirm with your care team. The app records timing and does not diagnose labor."
+        header={t('settings.callRule')}
+        footer={t('settings.callRuleFooter')}
       >
         <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
           <SegmentedControl
-            options={rulePresets.map((preset) => ({ key: preset.label, label: preset.label }))}
+            options={rulePresets.map((preset) => ({ key: preset.label, label: preset.label === 'Custom' ? t('common.custom') : preset.label }))}
             value={ruleSegmentValue}
             onChange={applyPreset}
           />
         </View>
         {isCustomRule || rule.label === 'Custom' ? (
           <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm, gap: spacing.sm }}>
-            <TextField label="Rule label" value={rule.label} onChangeText={(label) => setRule((value) => ({ ...value, label }))} onBlur={() => commitRule({})} />
+            <TextField label={t('settings.ruleLabel')} value={rule.label} onChangeText={(label) => setRule((value) => ({ ...value, label }))} onBlur={() => commitRule({})} />
             <TextField
-              label="Interval (minutes max)"
+              label={t('settings.intervalMinutesMax')}
               value={rule.intervalMinutes}
               keyboardType="number-pad"
               onChangeText={(intervalMinutes) => setRule((value) => ({ ...value, intervalMinutes }))}
               onBlur={() => commitRule({})}
             />
             <TextField
-              label="Duration (seconds min)"
+              label={t('settings.durationSecondsMin')}
               value={rule.durationSeconds}
               keyboardType="number-pad"
               onChangeText={(durationSeconds) => setRule((value) => ({ ...value, durationSeconds }))}
               onBlur={() => commitRule({})}
             />
             <TextField
-              label="Window (minutes)"
+              label={t('settings.windowMinutes')}
               value={rule.windowMinutes}
               keyboardType="number-pad"
               onChangeText={(windowMinutes) => setRule((value) => ({ ...value, windowMinutes }))}
               onBlur={() => commitRule({})}
             />
             <TextField
-              label="Action text"
+              label={t('settings.actionText')}
               value={rule.actionText}
               onChangeText={(actionText) => setRule((value) => ({ ...value, actionText }))}
               onBlur={() => commitRule({})}
@@ -292,8 +301,8 @@ export default function SettingsRoute() {
 
       {__DEV__ ? (
         <ListSection
-          header="Mock data"
-          footer="Development only. Loading a scenario replaces local sessions, contractions, urgent events, and profile/rule defaults."
+          header={t('settings.mockData')}
+          footer={t('settings.mockDataFooter')}
         >
           {MOCK_CONTRACTION_SCENARIOS.map((scenario) => (
             <ListRow
@@ -307,15 +316,15 @@ export default function SettingsRoute() {
         </ListSection>
       ) : null}
 
-      <ListSection header="Privacy" footer="All data stays on this device unless you choose to share it.">
+      <ListSection header={t('settings.privacy')} footer={t('settings.privacyFooter')}>
         <ListRow
-          title="Delete all data"
+          title={t('settings.deleteAllData')}
           destructive
           centerTitle
           onPress={() =>
-            Alert.alert('Delete all app data?', 'This removes sessions, contractions, urgent events, and edit history from this device.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: actions.deleteAllData },
+            Alert.alert(t('settings.deleteAllTitle'), t('settings.deleteAllBody'), [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('common.delete'), style: 'destructive', onPress: actions.deleteAllData },
             ])
           }
         />
@@ -323,10 +332,10 @@ export default function SettingsRoute() {
 
       <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.sm, paddingBottom: spacing.xl, gap: 4 }}>
         <Caption1 color="secondary" style={{ textAlign: 'center' }}>
-          Contraction Timer · v1.0.0 · Content {CONTENT_VERSION}
+          {t('settings.contentVersion', { version: '1.0.0', contentVersion: CONTENT_VERSION })}
         </Caption1>
         <Footnote color="secondary" style={{ textAlign: 'center' }}>
-          Theme: {scheme}
+          {t('settings.themeStatus', { scheme })}
         </Footnote>
       </View>
 
@@ -369,21 +378,35 @@ function PhoneRow({
   );
 }
 
-function showThemePicker(current: ThemePreference, set: (value: ThemePreference) => void) {
-  Alert.alert('Theme', 'Choose a theme', [
+function showThemePicker(current: ThemePreference, set: (value: ThemePreference) => void, t: AppT) {
+  Alert.alert(t('settings.theme'), t('settings.chooseTheme'), [
     {
-      text: `System${current === 'system' ? ' ✓' : ''}`,
+      text: `${t('common.system')}${current === 'system' ? ' ✓' : ''}`,
       onPress: () => set('system'),
     },
     {
-      text: `Light${current === 'light' ? ' ✓' : ''}`,
+      text: `${t('common.light')}${current === 'light' ? ' ✓' : ''}`,
       onPress: () => set('light'),
     },
     {
-      text: `Dark${current === 'dark' ? ' ✓' : ''}`,
+      text: `${t('common.dark')}${current === 'dark' ? ' ✓' : ''}`,
       onPress: () => set('dark'),
     },
-    { text: 'Cancel', style: 'cancel' },
+    { text: t('common.cancel'), style: 'cancel' },
+  ]);
+}
+
+function showLanguagePicker(
+  current: LanguagePreference,
+  set: (value: LanguagePreference) => void,
+  t: AppT,
+) {
+  Alert.alert(t('language.title'), t('language.choose'), [
+    ...languageOptions.map((option) => ({
+      text: `${t(option.labelKey)}${current === option.key ? ' ✓' : ''}`,
+      onPress: () => set(option.key),
+    })),
+    { text: t('common.cancel'), style: 'cancel' as const },
   ]);
 }
 

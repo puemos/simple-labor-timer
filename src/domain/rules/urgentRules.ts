@@ -1,17 +1,20 @@
 import { activeEvent, eventDurationSeconds, eventIntervalSeconds, visibleEvents } from '@/domain/timing/timeMath';
 import { ContractionEvent, PregnancyProfile, UrgentRuleResult } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 
 export function evaluateUrgentRules(
   events: ContractionEvent[],
   profile: PregnancyProfile,
   now: string,
+  options?: LocaleFormatOptions,
 ): UrgentRuleResult {
+  const t = resolveT(options);
   const active = activeEvent(events);
   if (active && (eventDurationSeconds(active, now) ?? 0) >= 120) {
     return {
       active: true,
       type: 'contraction_over_2_min',
-      message: 'This contraction has lasted longer than 2 minutes. Contact your care team urgently.',
+      message: t('rules.urgentOver2Min'),
       sourceIds: ['S4'],
     };
   }
@@ -29,7 +32,7 @@ export function evaluateUrgentRules(
       return {
         active: true,
         type: 'under_37_weeks_labor_concern',
-        message: 'Under 37 weeks with frequent contractions. Contact your care team urgently.',
+        message: t('rules.urgentUnder37'),
         sourceIds: ['S3', 'S4'],
       };
     }
@@ -39,7 +42,7 @@ export function evaluateUrgentRules(
     return {
       active: true,
       type: 'planned_c_section_or_call_early',
-      message: 'Your saved profile says to call early. Contact your care team.',
+      message: t('rules.urgentCallEarly'),
       sourceIds: ['S4'],
     };
   }
@@ -57,3 +60,7 @@ export const urgentTypeLabels: Record<NonNullable<UrgentRuleResult['type']>, str
   fever_unwell: 'Fever or feeling very unwell',
   planned_c_section_or_call_early: 'Planned C-section or call early',
 };
+
+export function urgentTypeLabel(type: NonNullable<UrgentRuleResult['type']>, options?: LocaleFormatOptions): string {
+  return resolveT(options)(`urgentTypes.${type}`);
+}

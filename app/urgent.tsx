@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { hapticImpactLight, hapticWarning } from '@/native/haptics';
-import { urgentTypeLabels } from '@/domain/rules/urgentRules';
+import { urgentTypeLabel } from '@/domain/rules/urgentRules';
 import { formatTimeOnly } from '@/domain/timing/dateFormat';
 import { UrgentType } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import {
   Body,
   Button,
@@ -23,18 +24,20 @@ import {
 import { Icons } from '@/ui/icons';
 import { useTheme } from '@/ui/theme';
 
-const urgentItems: { type: UrgentType; icon: typeof Icons.Siren; color: string; label: string }[] = [
-  { type: 'water_broke', icon: Icons.Droplets, color: '#0A84FF', label: 'Waters broke' },
-  { type: 'vaginal_bleeding', icon: Icons.Waves, color: '#FF453A', label: 'Vaginal bleeding' },
-  { type: 'reduced_fetal_movement', icon: Icons.HeartPulse, color: '#FF2D55', label: 'Reduced movement' },
-  { type: 'under_37_weeks_labor_concern', icon: Icons.AlertTriangle, color: '#FF9F0A', label: 'Under 37 weeks' },
-  { type: 'contraction_over_2_min', icon: Icons.Flame, color: '#FF9F0A', label: 'Over 2 minutes' },
-  { type: 'severe_or_unusual_pain', icon: Icons.ShieldAlert, color: '#FF453A', label: 'Severe or unusual pain' },
-  { type: 'fever_unwell', icon: Icons.Thermometer, color: '#FF9500', label: 'Fever / unwell' },
-  { type: 'planned_c_section_or_call_early', icon: Icons.Siren, color: '#5856D6', label: 'Call early instructions' },
+const urgentItems: { type: UrgentType; icon: typeof Icons.Siren; color: string; labelKey: string }[] = [
+  { type: 'water_broke', icon: Icons.Droplets, color: '#0A84FF', labelKey: 'urgent.watersBroke' },
+  { type: 'vaginal_bleeding', icon: Icons.Waves, color: '#FF453A', labelKey: 'urgent.vaginalBleeding' },
+  { type: 'reduced_fetal_movement', icon: Icons.HeartPulse, color: '#FF2D55', labelKey: 'urgent.reducedMovement' },
+  { type: 'under_37_weeks_labor_concern', icon: Icons.AlertTriangle, color: '#FF9F0A', labelKey: 'urgent.under37Weeks' },
+  { type: 'contraction_over_2_min', icon: Icons.Flame, color: '#FF9F0A', labelKey: 'urgent.over2Minutes' },
+  { type: 'severe_or_unusual_pain', icon: Icons.ShieldAlert, color: '#FF453A', labelKey: 'urgent.severePain' },
+  { type: 'fever_unwell', icon: Icons.Thermometer, color: '#FF9500', labelKey: 'urgent.feverUnwell' },
+  { type: 'planned_c_section_or_call_early', icon: Icons.Siren, color: '#5856D6', labelKey: 'urgent.callEarlyInstructions' },
 ];
 
 export default function UrgentRoute() {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, spacing, radii } = useTheme();
   const { actions, busy, snapshot, urgentRuleResult } = useContractionApp();
   const [recordedFlash, setRecordedFlash] = useState<{ type: UrgentType; id?: string } | null>(null);
@@ -58,10 +61,10 @@ export default function UrgentRoute() {
   }
 
   const phones = [
-    { label: 'Care team', value: snapshot?.profile.careTeamPhone },
-    { label: 'Birth location', value: snapshot?.profile.birthLocationPhone },
-    { label: snapshot?.profile.doulaName || 'Doula', value: snapshot?.profile.doulaPhone },
-    { label: 'Emergency', value: snapshot?.profile.emergencyPhone, emergency: true },
+    { label: t('settings.careTeam'), value: snapshot?.profile.careTeamPhone },
+    { label: t('settings.birthLocation'), value: snapshot?.profile.birthLocationPhone },
+    { label: snapshot?.profile.doulaName || t('urgent.doula'), value: snapshot?.profile.doulaPhone },
+    { label: t('settings.emergency'), value: snapshot?.profile.emergencyPhone, emergency: true },
   ];
 
   return (
@@ -69,8 +72,8 @@ export default function UrgentRoute() {
       <Screen
         scrollable
         background="grouped"
-        largeTitle="Urgent"
-        headerLeft={<IconButton icon={Icons.X} label="Close" onPress={() => router.back()} />}
+        largeTitle={t('urgent.title')}
+        headerLeft={<IconButton icon={Icons.X} label={t('common.close')} onPress={() => router.back()} />}
       >
         <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.base }}>
           {urgentRuleResult.active ? (
@@ -91,12 +94,12 @@ export default function UrgentRoute() {
             </View>
           ) : (
             <Subhead color="secondary">
-              Use this screen for warning signs that override timing — call your care team and record the event below.
+              {t('urgent.intro')}
             </Subhead>
           )}
         </View>
 
-        <ListSection header="Contact">
+        <ListSection header={t('urgent.contact')}>
           {phones
             .filter((phone) => phone.value)
             .map((phone) => (
@@ -114,18 +117,18 @@ export default function UrgentRoute() {
           {phones.every((phone) => !phone.value) ? (
             <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
               <Body color="secondary" style={{ marginBottom: spacing.sm }}>
-                No contacts saved yet.
+                {t('urgent.noContacts')}
               </Body>
-              <Button variant="tinted" label="Add contacts" onPress={() => router.push('/settings')} fullWidth />
+              <Button variant="tinted" label={t('urgent.addContacts')} onPress={() => router.push('/settings')} fullWidth />
             </View>
           ) : null}
         </ListSection>
 
-        <ListSection header="Record warning sign" footer="Tapping a row records the event immediately.">
+        <ListSection header={t('urgent.recordWarningSign')} footer={t('urgent.recordWarningFooter')}>
           {urgentItems.map((item) => (
             <ListRow
               key={item.type}
-              title={item.label}
+              title={t(item.labelKey)}
               leading={{ icon: item.icon, color: item.color }}
               trailing="chevron"
               onPress={() => record(item.type)}
@@ -148,27 +151,27 @@ export default function UrgentRoute() {
                 }}
               >
                 <Icons.Check color={colors.success} size={20} strokeWidth={2.4} />
-                <Body style={{ flex: 1 }}>Recorded {urgentTypeLabels[recordedFlash.type]}.</Body>
-                <Button variant="plain" size="sm" label="Undo" onPress={undoLast} />
+                <Body style={{ flex: 1 }}>{t('urgent.recorded', { label: urgentTypeLabel(recordedFlash.type, { t, locale }) })}</Body>
+                <Button variant="plain" size="sm" label={t('common.undo')} onPress={undoLast} />
               </View>
             </View>
           </Animated.View>
         ) : null}
 
-        <ListSection header="Recorded in this session">
+        <ListSection header={t('urgent.recordedInSession')}>
           {snapshot?.urgentEvents.length ? (
             snapshot.urgentEvents.map((event) => (
               <ListRow
                 key={event.id}
-                title={urgentTypeLabels[event.type]}
+                title={urgentTypeLabel(event.type, { t, locale })}
                 subtitle={event.note}
                 trailing="value"
-                value={formatTimeOnly(event.occurredAt)}
+                value={formatTimeOnly(event.occurredAt, { t, locale })}
               />
             ))
           ) : (
             <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
-              <Footnote color="secondary">No urgent events recorded.</Footnote>
+              <Footnote color="secondary">{t('urgent.noneRecorded')}</Footnote>
             </View>
           )}
         </ListSection>
@@ -176,7 +179,7 @@ export default function UrgentRoute() {
         <View style={{ height: spacing.lg }} />
         {/* Cap the bottom with a tiny version note */}
         <Caption1 color="tertiary" style={{ textAlign: 'center', marginBottom: spacing.lg }}>
-          Recording an urgent event keeps timing data intact.
+          {t('urgent.footer')}
         </Caption1>
       </Screen>
     </Sheet>

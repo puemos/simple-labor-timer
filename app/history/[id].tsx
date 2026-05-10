@@ -4,6 +4,7 @@ import { Alert, View } from 'react-native';
 import { formatDateTime, formatEditableDateTime, normalizeDateTimeToIso } from '@/domain/timing/dateFormat';
 import { eventDurationSeconds, eventIntervalSeconds, formatShortDuration, nowIso, visibleEvents } from '@/domain/timing/timeMath';
 import { Intensity } from '@/domain/types';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Button,
@@ -21,14 +22,16 @@ import {
 import { Icons } from '@/ui/icons';
 import { useTheme } from '@/ui/theme';
 
-const intensityOptions: { key: Intensity; label: string }[] = [
-  { key: 'mild', label: 'Mild' },
-  { key: 'moderate', label: 'Moderate' },
-  { key: 'strong', label: 'Strong' },
-  { key: 'cannot_talk_walk', label: "Can't talk" },
+const intensityOptions: { key: Intensity; labelKey: string }[] = [
+  { key: 'mild', labelKey: 'intensity.mild' },
+  { key: 'moderate', labelKey: 'intensity.moderate' },
+  { key: 'strong', labelKey: 'intensity.strong' },
+  { key: 'cannot_talk_walk', labelKey: 'intensity.cannot_talk_walk' },
 ];
 
 export default function HistoryDetailRoute() {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { spacing } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { actions, busy, snapshot } = useContractionApp();
@@ -62,10 +65,10 @@ export default function HistoryDetailRoute() {
     return (
       <Screen
         background="grouped"
-        headerTitle="Contraction"
-        headerLeft={<IconButton icon={Icons.ChevronLeft} label="Back" onPress={() => router.back()} />}
+        headerTitle={t('time.contraction', { count: 1 })}
+        headerLeft={<IconButton icon={Icons.ChevronLeft} label={t('common.back')} onPress={() => router.back()} />}
       >
-        <EmptyState icon={Icons.AlertTriangle} title="Contraction not found" body="It may have been deleted." />
+        <EmptyState icon={Icons.AlertTriangle} title={t('history.contractionNotFoundTitle')} body={t('history.contractionNotFoundBody')} />
       </Screen>
     );
   }
@@ -85,53 +88,53 @@ export default function HistoryDetailRoute() {
       scrollable
       background="grouped"
       headerTitle={`#${eventIndex + 1}`}
-      headerLeft={<IconButton icon={Icons.ChevronLeft} label="Back" onPress={() => router.back()} />}
+      headerLeft={<IconButton icon={Icons.ChevronLeft} label={t('common.back')} onPress={() => router.back()} />}
     >
       <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.sm, marginBottom: spacing.base }}>
-        <Title3>Contraction #{eventIndex + 1}</Title3>
+        <Title3>{t('history.contractionTitle', { count: eventIndex + 1 })}</Title3>
         <Footnote color="secondary" style={{ marginTop: 2 }}>
-          {formatDateTime(event.startAt)}
+          {formatDateTime(event.startAt, { t, locale })}
         </Footnote>
       </View>
 
-      <ListSection header="Stats">
-        <ListRow title="Duration" value={formatShortDuration(eventDurationSeconds(event))} trailing="value" />
-        <ListRow title="Interval from previous" value={formatShortDuration(eventIntervalSeconds(event, previous))} trailing="value" />
-        {event.manuallyEdited ? <ListRow title="Edited" value="Manually adjusted" trailing="value" /> : null}
+      <ListSection header={t('history.stats')}>
+        <ListRow title={t('timer.duration')} value={formatShortDuration(eventDurationSeconds(event), { t, locale })} trailing="value" />
+        <ListRow title={t('history.intervalFromPrevious')} value={formatShortDuration(eventIntervalSeconds(event, previous), { t, locale })} trailing="value" />
+        {event.manuallyEdited ? <ListRow title={t('history.edited')} value={t('history.manuallyAdjusted')} trailing="value" /> : null}
       </ListSection>
 
-      <ListSection header="Intensity">
+      <ListSection header={t('history.intensity')}>
         <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
           <SegmentedControl
-            options={intensityOptions}
+            options={intensityOptions.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
             value={(event.intensity ?? 'mild') as Intensity}
             onChange={(intensity) => actions.updateEvent(event.id, { intensity })}
           />
         </View>
       </ListSection>
 
-      <ListSection header="Edit">
+      <ListSection header={t('history.edit')}>
         <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm, gap: spacing.sm }}>
-          <DateTimeField label="Start" value={draft.startAt} onChangeText={(startAt) => setDraft((value) => ({ ...value, startAt }))} />
-          <DateTimeField label="End" value={draft.endAt} onChangeText={(endAt) => setDraft((value) => ({ ...value, endAt }))} />
+          <DateTimeField label={t('history.start')} value={draft.startAt} onChangeText={(startAt) => setDraft((value) => ({ ...value, startAt }))} />
+          <DateTimeField label={t('history.end')} value={draft.endAt} onChangeText={(endAt) => setDraft((value) => ({ ...value, endAt }))} />
           <TextField
-            label="Note"
+            label={t('history.note')}
             value={draft.note}
             onChangeText={(note) => setDraft((value) => ({ ...value, note }))}
           />
-          <Button variant="filled" label="Save changes" onPress={save} loading={busy} fullWidth />
+          <Button variant="filled" label={t('common.saveChanges')} onPress={save} loading={busy} fullWidth />
         </View>
       </ListSection>
 
-      <ListSection header="Actions">
+      <ListSection header={t('history.actions')}>
         <ListRow
-          title="Split into two"
+          title={t('history.splitIntoTwo')}
           leading={{ icon: Icons.Scissors, color: '#5856D6' }}
           onPress={() => actions.splitEvent(event.id)}
           trailing="chevron"
         />
         <ListRow
-          title="Merge with previous"
+          title={t('history.mergeWithPrevious')}
           leading={{ icon: Icons.Combine, color: '#FF9500' }}
           onPress={() => actions.mergeWithPrevious(event.id)}
           trailing="chevron"
@@ -140,14 +143,14 @@ export default function HistoryDetailRoute() {
 
       <ListSection>
         <ListRow
-          title="Delete contraction"
+          title={t('history.deleteContraction')}
           destructive
           centerTitle
           onPress={() =>
-            Alert.alert('Delete contraction?', 'You can restore the most recent deletion from History.', [
-              { text: 'Cancel', style: 'cancel' },
+            Alert.alert(t('history.deleteContractionTitle'), t('history.deleteContractionBody'), [
+              { text: t('common.cancel'), style: 'cancel' },
               {
-                text: 'Delete',
+                text: t('common.delete'),
                 style: 'destructive',
                 onPress: async () => {
                   await actions.deleteEvent(event.id);

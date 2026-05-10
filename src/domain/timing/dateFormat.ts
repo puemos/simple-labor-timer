@@ -1,58 +1,60 @@
+import { LocaleFormatOptions, resolveLocale, resolveT } from '@/i18n/format';
+
 type DateInput = string | number | Date | undefined;
 
-const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+const dateTimeOptions: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: 'short',
   day: 'numeric',
   hour: 'numeric',
   minute: '2-digit',
   second: '2-digit',
-});
+};
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
+const dateOptions: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: 'short',
   day: 'numeric',
-});
+};
 
-const timeFormatter = new Intl.DateTimeFormat(undefined, {
+const timeOptions: Intl.DateTimeFormatOptions = {
   hour: 'numeric',
   minute: '2-digit',
-});
+};
 
-const compactDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+const compactDateTimeOptions: Intl.DateTimeFormatOptions = {
   month: 'short',
   day: 'numeric',
   hour: 'numeric',
   minute: '2-digit',
-});
+};
 
-export function formatDateTime(value: DateInput): string {
+export function formatDateTime(value: DateInput, options?: LocaleFormatOptions): string {
   const date = validDate(value);
-  return date ? dateTimeFormatter.format(date) : '';
+  return date ? formatter(options, dateTimeOptions).format(date) : '';
 }
 
-export function formatCompactDateTime(value: DateInput): string {
+export function formatCompactDateTime(value: DateInput, options?: LocaleFormatOptions): string {
   const date = validDate(value);
   if (!date) {
     return '';
   }
 
   if (sameLocalDay(date, new Date())) {
-    return `Today, ${timeFormatter.format(date)}`;
+    return `${resolveT(options)('time.today')}, ${formatter(options, timeOptions).format(date)}`;
   }
 
-  return compactDateTimeFormatter.format(date);
+  return formatter(options, compactDateTimeOptions).format(date);
 }
 
-export function formatDateOnly(value: DateInput): string {
+export function formatDateOnly(value: DateInput, options?: LocaleFormatOptions): string {
   const date = validDate(value);
-  return date ? dateFormatter.format(date) : '';
+  return date ? formatter(options, dateOptions).format(date) : '';
 }
 
-export function formatTimeOnly(value: DateInput): string {
+export function formatTimeOnly(value: DateInput, options?: LocaleFormatOptions): string {
   const date = validDate(value);
-  return date ? timeFormatter.format(date) : '';
+  return date ? formatter(options, timeOptions).format(date) : '';
 }
 
 export function formatEditableDateTime(value: DateInput): string {
@@ -165,6 +167,10 @@ function sameLocalDay(first: Date, second: Date): boolean {
     first.getMonth() === second.getMonth() &&
     first.getDate() === second.getDate()
   );
+}
+
+function formatter(options: LocaleFormatOptions | undefined, formatOptions: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat(resolveLocale(options), formatOptions);
 }
 
 function pad(value: number): string {

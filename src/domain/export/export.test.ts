@@ -17,6 +17,7 @@ const matchedRule: ProviderRuleResult = {
   met: true,
   label: '5-1-1',
   message: 'This matches your saved call rule. Contact your care team.',
+  ruleStatus: 'matched',
   sourceIds: ['S2'],
   matchedEventIds: ['event_1', 'event_2'],
 };
@@ -43,7 +44,7 @@ describe('summary text export', () => {
     expect(text).toContain('Averages, last 5');
     expect(text).toContain('Contraction: 1m');
     expect(text).toContain('Rest: 4m');
-    expect(text).toContain('Intensity: strong');
+    expect(text).toContain('Intensity: Strong');
     expect(text).toContain('Note: lower back pressure');
     expect(text).toContain('Saved rule: 5-1-1');
     expect(text).toContain('Status: matched');
@@ -55,7 +56,7 @@ describe('summary text export', () => {
       profile,
       events: [makeEvent('event_1', '2026-05-10T02:00:00.000Z', 60, { note: 'private note' })],
       urgentEvents: [urgentEvent],
-      providerRuleResult: { ...matchedRule, met: false },
+      providerRuleResult: { ...matchedRule, met: false, ruleStatus: 'not_matched' },
       now: '2026-05-10T02:10:00.000Z',
       rangeLabel: 'Today',
       appVersion: '1.0.0',
@@ -85,6 +86,25 @@ describe('summary text export', () => {
     expect(text).toContain('Manual edits: 1 contraction record(s) edited');
     expect(text).toContain('Saved rule: not saved');
     expect(text).not.toMatch(/csv|spreadsheet/i);
+  });
+
+  it('localizes export headings and pluralized labels', () => {
+    const text = buildSummaryText({
+      profile,
+      events: [makeEvent('event_1', '2026-05-10T02:00:00.000Z', 60)],
+      urgentEvents: [],
+      providerRuleResult: undefined,
+      now: '2026-05-10T02:10:00.000Z',
+      rangeLabel: 'Sessione attuale',
+      appVersion: '1.0.0',
+      includeNotes: true,
+      includeUrgentEvents: true,
+      locale: 'it',
+    });
+
+    expect(text).toContain('Aggiornamento contrazioni');
+    expect(text).toContain('Riepilogo');
+    expect(text).toContain('Regola di chiamata');
   });
 });
 
@@ -133,7 +153,8 @@ describe('summary PDF export', () => {
       includeUrgentEvents: true,
     });
 
-    expect(html).toMatch(/<tr>[\s\S]*Intensity: cannot talk walk[\s\S]*Note: &lt;call &amp; go&gt;[\s\S]*<\/tr>/);
+    expect(html).toMatch(/<tr>[\s\S]*Intensity: Can&#39;t talk|<tr>[\s\S]*Intensity: Can't talk/);
+    expect(html).toMatch(/<tr>[\s\S]*Note: &lt;call &amp; go&gt;[\s\S]*<\/tr>/);
     expect(html).not.toContain('Note: <call & go>');
   });
 

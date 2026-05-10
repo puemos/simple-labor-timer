@@ -8,6 +8,7 @@ import {
   visibleEvents,
 } from '@/domain/timing/timeMath';
 import { ContractionEvent, PatternLabel, ProviderRuleResult, UrgentRuleResult } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 
 export const DEFAULT_RHYTHM_WINDOW_MINUTES = 60;
 
@@ -53,7 +54,7 @@ export type RhythmInsight = {
 export type RhythmInsightOptions = {
   providerRuleResult?: Pick<ProviderRuleResult, 'met' | 'message'>;
   urgentRuleResult?: Pick<UrgentRuleResult, 'active' | 'message'>;
-};
+} & LocaleFormatOptions;
 
 export function buildRhythmSummary(
   events: ContractionEvent[],
@@ -108,36 +109,38 @@ export function buildRhythmSummary(
   };
 }
 
-export function rhythmStatusText(pattern: PatternLabel): string {
+export function rhythmStatusText(pattern: PatternLabel, options?: LocaleFormatOptions): string {
+  const t = resolveT(options);
   switch (pattern) {
     case 'getting_closer':
-      return 'Getting closer';
+      return t('rhythm.statusGettingCloser');
     case 'spacing_out':
-      return 'Spacing out';
+      return t('rhythm.statusSpacingOut');
     case 'regular':
-      return 'Holding steady';
+      return t('rhythm.statusHoldingSteady');
     case 'inconsistent':
-      return 'Irregular';
+      return t('rhythm.statusIrregular');
     case 'insufficient_data':
-      return 'Need more data';
+      return t('rhythm.statusNeedMoreData');
   }
 }
 
 export function buildRhythmInsight(summary: RhythmSummary, options: RhythmInsightOptions = {}): RhythmInsight {
+  const t = resolveT(options);
   if (options.urgentRuleResult?.active) {
     return {
-      headline: 'Call now',
-      body: options.urgentRuleResult.message ?? 'A warning sign is active. Contact your care team now.',
-      action: 'Contact your care team now.',
+      headline: t('rhythm.insightCallNow'),
+      body: options.urgentRuleResult.message ?? t('timer.urgentWarningFallback'),
+      action: t('rhythm.insightCallNowCareTeam'),
       tone: 'urgent',
     };
   }
 
   if (options.providerRuleResult?.met) {
     return {
-      headline: 'Call now',
+      headline: t('rhythm.insightCallNow'),
       body: options.providerRuleResult.message,
-      action: 'Call your care team.',
+      action: t('rhythm.insightCallYourCareTeam'),
       tone: 'urgent',
     };
   }
@@ -145,40 +148,40 @@ export function buildRhythmInsight(summary: RhythmSummary, options: RhythmInsigh
   switch (summary.pattern) {
     case 'getting_closer':
       return {
-        headline: 'Getting closer',
-        body: 'Intervals are getting closer. Keep timing and follow your call rule.',
-        action: 'Call if this matches your care team rule.',
+        headline: t('rhythm.statusGettingCloser'),
+        body: t('rhythm.insightGettingCloserBody'),
+        action: t('rhythm.insightGettingCloserAction'),
         tone: 'accent',
       };
     case 'regular':
       return {
-        headline: 'Holding steady',
-        body: 'Contractions are coming in a steady rhythm.',
-        action: 'Keep timing and watch duration.',
+        headline: t('rhythm.statusHoldingSteady'),
+        body: t('rhythm.insightHoldingSteadyBody'),
+        action: t('rhythm.insightHoldingSteadyAction'),
         tone: 'success',
       };
     case 'spacing_out':
       return {
-        headline: 'Spacing out',
-        body: 'Intervals are getting farther apart.',
-        action: 'Keep timing; rest if you can.',
+        headline: t('rhythm.statusSpacingOut'),
+        body: t('rhythm.insightSpacingOutBody'),
+        action: t('rhythm.insightSpacingOutAction'),
         tone: 'warning',
       };
     case 'inconsistent':
       return {
-        headline: 'Irregular',
-        body: 'Intervals are still changing from one contraction to the next.',
-        action: 'Keep timing until a clearer pattern appears.',
+        headline: t('rhythm.statusIrregular'),
+        body: t('rhythm.insightIrregularBody'),
+        action: t('rhythm.insightIrregularAction'),
         tone: 'neutral',
       };
     case 'insufficient_data':
       return {
-        headline: 'Too early to tell',
+        headline: t('rhythm.insightTooEarly'),
         body:
           summary.eventCount < 2
-            ? 'Time the next contraction to start reading the rhythm.'
-            : 'Keep timing until the rhythm is clearer.',
-        action: 'Keep timing the next contraction.',
+            ? t('rhythm.insightNextContractionBody')
+            : t('rhythm.insightKeepTimingBody'),
+        action: t('rhythm.insightKeepTimingAction'),
         tone: 'neutral',
       };
   }

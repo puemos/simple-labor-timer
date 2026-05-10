@@ -8,6 +8,7 @@ import { computeSessionSummary } from '@/domain/timing/summaries';
 import { nowIso } from '@/domain/timing/timeMath';
 import { AppSnapshot, ContractionEvent, PregnancyProfile, ProviderRule, UrgentType } from '@/domain/types';
 import { getAppRepository } from '@/data/db';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { hapticEnd, hapticStart, hapticWarning } from '@/native/haptics';
 
 type EventPatch = Partial<Pick<ContractionEvent, 'startAt' | 'endAt' | 'intensity' | 'note'>>;
@@ -121,6 +122,8 @@ export function useContractionBootstrap() {
 }
 
 export function useContractionApp() {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const loading = useContractionStore((state) => state.loading);
   const busy = useContractionStore((state) => state.busy);
   const error = useContractionStore((state) => state.error);
@@ -153,12 +156,12 @@ export function useContractionApp() {
     [now, snapshot?.activeSession, snapshot?.events],
   );
   const providerRuleResult = useMemo(
-    () => evaluateProviderRule(snapshot?.events ?? [], snapshot?.providerRule, now),
-    [now, snapshot?.events, snapshot?.providerRule],
+    () => evaluateProviderRule(snapshot?.events ?? [], snapshot?.providerRule, now, { t, locale }),
+    [locale, now, snapshot?.events, snapshot?.providerRule, t],
   );
   const urgentRuleResult = useMemo(
-    () => (snapshot ? evaluateUrgentRules(snapshot.events, snapshot.profile, now) : { active: false, sourceIds: [] as string[] }),
-    [now, snapshot],
+    () => (snapshot ? evaluateUrgentRules(snapshot.events, snapshot.profile, now, { t, locale }) : { active: false, sourceIds: [] as string[] }),
+    [locale, now, snapshot, t],
   );
 
   useEffect(() => {
@@ -184,12 +187,14 @@ export function useContractionApp() {
       urgentEvents: snapshot.urgentEvents,
       providerRuleResult,
       now,
-      rangeLabel: 'Current session',
+      rangeLabel: t('time.currentSession'),
       appVersion: '1.0.0',
       includeNotes: true,
       includeUrgentEvents: true,
+      locale,
+      t,
     });
-  }, [now, providerRuleResult, snapshot]);
+  }, [locale, now, providerRuleResult, snapshot, t]);
 
   return {
     loading,

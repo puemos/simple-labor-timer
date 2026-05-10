@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Temporizador de contracciones",
+  "NSFaceIDUsageDescription": "Permite que Temporizador de contracciones acceda a tus datos biométricos de Face ID.",
+  "NSMicrophoneUsageDescription": ""
+}

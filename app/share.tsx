@@ -8,6 +8,7 @@ import { buildSummaryPdfHtml, buildSummaryText } from '@/domain/export/summaryTe
 import { evaluateProviderRule } from '@/domain/rules/providerRule';
 import { minutesAgo, parseIso, startOfLocalDayIso } from '@/domain/timing/timeMath';
 import { ContractionEvent, ContractionSession, ShareFormat, UrgentEvent } from '@/domain/types';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Button,
@@ -26,18 +27,20 @@ import { useTheme } from '@/ui/theme';
 
 type RangeKey = 'today' | 'last24' | 'session';
 
-const ranges: { key: RangeKey; label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'last24', label: 'Last 24h' },
-  { key: 'session', label: 'Session' },
+const ranges: { key: RangeKey; labelKey: string }[] = [
+  { key: 'today', labelKey: 'time.today' },
+  { key: 'last24', labelKey: 'time.last24h' },
+  { key: 'session', labelKey: 'time.session' },
 ];
 
-const formats: { key: ShareFormat; label: string; color: string }[] = [
-  { key: 'plain_text', label: 'Message', color: '#007AFF' },
-  { key: 'pdf', label: 'PDF', color: '#FF3B30' },
+const formats: { key: ShareFormat; labelKey: string; color: string }[] = [
+  { key: 'plain_text', labelKey: 'share.message', color: '#007AFF' },
+  { key: 'pdf', labelKey: 'common.pdf', color: '#FF3B30' },
 ];
 
 export default function ShareRoute() {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, spacing } = useTheme();
   const { now, snapshot } = useContractionApp();
   const [range, setRange] = useState<RangeKey>('session');
@@ -57,8 +60,8 @@ export default function ShareRoute() {
     return filterUrgentEvents(snapshot?.allUrgentEvents ?? [], range, now, selectedSession);
   }, [now, range, selectedSession, snapshot?.allUrgentEvents]);
   const exportProviderRuleResult = useMemo(
-    () => evaluateProviderRule(filteredEvents, snapshot?.providerRule, exportNow),
-    [exportNow, filteredEvents, snapshot?.providerRule],
+    () => evaluateProviderRule(filteredEvents, snapshot?.providerRule, exportNow, { t, locale }),
+    [exportNow, filteredEvents, locale, snapshot?.providerRule, t],
   );
   const summarySession = range === 'session' ? selectedSession : undefined;
 
@@ -71,10 +74,12 @@ export default function ShareRoute() {
       urgentEvents: filteredUrgent,
       providerRuleResult: exportProviderRuleResult,
       now: exportNow,
-      rangeLabel: formatRangeLabel(range, selectedSession),
+      rangeLabel: formatRangeLabel(range, selectedSession, t),
       appVersion: '1.0.0',
       includeNotes,
       includeUrgentEvents: includeUrgent,
+      locale,
+      t,
     };
   }, [
     exportNow,
@@ -87,6 +92,8 @@ export default function ShareRoute() {
     selectedSession,
     snapshot,
     summarySession,
+    t,
+    locale,
   ]);
   const preview = useMemo(() => (summaryInput ? buildSummaryText(summaryInput) : ''), [summaryInput]);
 
@@ -98,10 +105,10 @@ export default function ShareRoute() {
         await Share.share({ message: preview });
       } else {
         const { uri } = await Print.printToFileAsync({ html: buildSummaryPdfHtml(summaryInput) });
-        await shareFile(uri, 'application/pdf');
+        await shareFile(uri, 'application/pdf', t);
       }
     } catch (error) {
-      Alert.alert('Share failed', error instanceof Error ? error.message : 'The share sheet could not be opened.');
+      Alert.alert(t('share.shareFailedTitle'), error instanceof Error ? error.message : t('share.shareFailedBody'));
     } finally {
       setSharing(false);
     }
@@ -111,13 +118,13 @@ export default function ShareRoute() {
     return (
       <Sheet>
         <Screen
-          headerTitle="Share"
-          headerLeft={<IconButton icon={Icons.X} label="Close" onPress={() => router.back()} />}
+          headerTitle={t('share.title')}
+          headerLeft={<IconButton icon={Icons.X} label={t('common.close')} onPress={() => router.back()} />}
         >
           <EmptyState
             icon={Icons.Send}
-            title="Nothing to share yet"
-            body="Time a contraction first, then come back here for a preview."
+            title={t('share.nothingTitle')}
+            body={t('share.nothingBody')}
           />
         </Screen>
       </Sheet>
@@ -131,20 +138,20 @@ export default function ShareRoute() {
       <Screen
         scrollable
         background="grouped"
-        largeTitle="Share"
-        headerLeft={<IconButton icon={Icons.X} label="Close" onPress={() => router.back()} />}
+        largeTitle={t('share.title')}
+        headerLeft={<IconButton icon={Icons.X} label={t('common.close')} onPress={() => router.back()} />}
       >
-        <ListSection header="Range">
+        <ListSection header={t('share.range')}>
           <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
-            <SegmentedControl options={ranges} value={range} onChange={setRange} />
+            <SegmentedControl options={ranges.map((item) => ({ key: item.key, label: t(item.labelKey) }))} value={range} onChange={setRange} />
           </View>
         </ListSection>
 
-        <ListSection header="Format">
+        <ListSection header={t('share.format')}>
           {formats.map((option) => (
             <ListRow
               key={option.key}
-              title={option.label}
+              title={t(option.labelKey)}
               leading={{
                 icon: option.key === 'pdf' ? Icons.FileText : Icons.Send,
                 color: option.color,
@@ -156,9 +163,9 @@ export default function ShareRoute() {
           ))}
         </ListSection>
 
-        <ListSection header="Privacy" footer="Files are generated locally. No upload, account, or share link is created.">
+        <ListSection header={t('share.privacy')} footer={t('share.privacyFooter')}>
           <ListRow
-            title="Include notes"
+            title={t('share.includeNotes')}
             trailing={
               <Switch
                 value={includeNotes}
@@ -169,7 +176,7 @@ export default function ShareRoute() {
             }
           />
           <ListRow
-            title="Include urgent events"
+            title={t('share.includeUrgentEvents')}
             trailing={
               <Switch
                 value={includeUrgent}
@@ -183,7 +190,7 @@ export default function ShareRoute() {
 
         <ListSection>
           <ListRow
-            title={showPreview ? 'Hide preview' : 'Show preview'}
+            title={showPreview ? t('share.hidePreview') : t('share.showPreview')}
             leading={{ icon: Icons.FileText, color: colors.systemGray }}
             trailing="chevron"
             onPress={() => setShowPreview((value) => !value)}
@@ -201,14 +208,14 @@ export default function ShareRoute() {
           <Button
             variant="filled"
             size="lg"
-            label={`Share ${formatLabel(format)}`}
+            label={t('share.shareFormat', { format: formatLabel(format, t) })}
             leadingIcon={formatIcon}
             onPress={sharePreview}
             loading={sharing}
             fullWidth
           />
           <Caption1 color="tertiary" style={{ textAlign: 'center', marginTop: spacing.sm }}>
-            Content version {CONTENT_VERSION}
+            {t('share.contentVersion', { contentVersion: CONTENT_VERSION })}
           </Caption1>
         </View>
       </Screen>
@@ -243,28 +250,28 @@ function filterUrgentEvents(events: UrgentEvent[], range: RangeKey, now: string,
   return events.filter((event) => parseIso(event.occurredAt) >= parseIso(start));
 }
 
-async function shareFile(uri: string, mimeType: string) {
+async function shareFile(uri: string, mimeType: string, t: (key: string) => string) {
   if (!(await Sharing.isAvailableAsync())) {
-    Alert.alert('Share unavailable', 'The native share sheet is not available on this device.');
+    Alert.alert(t('share.unavailableTitle'), t('share.unavailableBody'));
     return;
   }
   await Sharing.shareAsync(uri, { mimeType });
 }
 
-function formatLabel(format: ShareFormat): string {
-  return format === 'plain_text' ? 'message' : format.toUpperCase();
+function formatLabel(format: ShareFormat, t: (key: string) => string): string {
+  return format === 'plain_text' ? t('share.messageFormat') : format.toUpperCase();
 }
 
-function formatRangeLabel(range: RangeKey, session?: ContractionSession): string {
+function formatRangeLabel(range: RangeKey, session: ContractionSession | undefined, t: (key: string) => string): string {
   switch (range) {
     case 'today':
-      return 'Today';
+      return t('time.today');
     case 'last24':
-      return 'Last 24 hours';
+      return t('time.last24Hours');
     case 'session':
       if (!session) {
-        return 'Session';
+        return t('time.session');
       }
-      return session.status === 'active' ? 'Current session' : 'Latest session';
+      return session.status === 'active' ? t('time.currentSession') : t('time.latestSession');
   }
 }

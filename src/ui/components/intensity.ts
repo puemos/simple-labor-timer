@@ -1,4 +1,5 @@
 import { Intensity } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 import { Palette } from '@/ui/theme/palette';
 
 export function intensityColor(intensity: Intensity | undefined, colors: Palette): string {
@@ -16,17 +17,18 @@ export function intensityColor(intensity: Intensity | undefined, colors: Palette
   }
 }
 
-export function intensityLabel(intensity: Intensity | undefined): string {
+export function intensityLabel(intensity: Intensity | undefined, options?: LocaleFormatOptions): string {
+  const t = resolveT(options);
   switch (intensity) {
     case 'mild':
-      return 'Mild';
+      return t('intensity.mild');
     case 'moderate':
-      return 'Moderate';
+      return t('intensity.moderate');
     case 'strong':
-      return 'Strong';
+      return t('intensity.strong');
     case 'cannot_talk_walk':
-      return "Can't talk";
+      return t('intensity.cannot_talk_walk');
     default:
-      return 'Unrated';
+      return t('intensity.unrated');
   }
 }

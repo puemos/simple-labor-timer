@@ -1,4 +1,5 @@
 import { PatternLabel } from '@/domain/types';
+import { LocaleFormatOptions, resolveT } from '@/i18n/format';
 
 export function classifyPattern(intervalsSeconds: number[]): PatternLabel {
   if (intervalsSeconds.length < 3) {
@@ -24,17 +25,18 @@ export function classifyPattern(intervalsSeconds: number[]): PatternLabel {
   return 'inconsistent';
 }
 
-export function patternText(pattern: PatternLabel): string {
+export function patternText(pattern: PatternLabel, options?: LocaleFormatOptions): string {
+  const t = resolveT(options);
   switch (pattern) {
     case 'getting_closer':
-      return 'Getting closer';
+      return t('rhythm.statusGettingCloser');
     case 'spacing_out':
-      return 'Spacing out';
+      return t('rhythm.statusSpacingOut');
     case 'regular':
-      return 'Regular pattern';
+      return t('rhythm.patternRegular');
     case 'inconsistent':
-      return 'Inconsistent';
+      return t('rhythm.patternInconsistent');
     case 'insufficient_data':
-      return 'Need more data';
+      return t('rhythm.statusNeedMoreData');
   }
 }

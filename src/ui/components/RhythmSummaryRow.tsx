@@ -2,6 +2,7 @@ import { Pressable, StyleProp, View, ViewStyle } from 'react-native';
 import { hapticSelection } from '@/native/haptics';
 import { formatShortDuration } from '@/domain/timing/timeMath';
 import { RhythmSummary, rhythmStatusText } from '@/domain/timing/rhythm';
+import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { Card } from '@/ui/components/Card';
 import { Caption1, Footnote, Headline, Subhead } from '@/ui/components/Text';
 import { Icons, ICON_STROKE_WIDTH } from '@/ui/icons';
@@ -18,25 +19,30 @@ type RhythmSummaryRowProps = {
 };
 
 export function RhythmSummaryRow({
-  title = 'Rhythm',
+  title,
   summary,
   onPress,
   disabled,
-  sourceLabel = 'Current session',
+  sourceLabel,
   background = 'secondary',
   style,
 }: RhythmSummaryRowProps) {
+  const { t } = useAppTranslation();
+  const { locale } = useAppLanguage();
   const { colors, radii, spacing } = useTheme();
+  const resolvedTitle = title ?? t('timer.rhythm');
+  const resolvedSourceLabel = sourceLabel ?? t('time.currentSession');
   const isDisabled = Boolean(disabled || summary.eventCount < 2 || !onPress);
-  const status = rhythmStatusText(summary.pattern);
-  const value = formatShortDuration(summary.averageIntervalSeconds);
+  const status = rhythmStatusText(summary.pattern, { t, locale });
+  const value = formatShortDuration(summary.averageIntervalSeconds, { t, locale });
   const subtitle =
     summary.eventCount < 2
-      ? 'Need one more contraction'
-      : `${summary.eventCount} ${summary.eventCount === 1 ? 'contraction' : 'contractions'} · ${formatShortDuration(
+      ? t('rhythm.needOneMore')
+      : `${summary.eventCount} ${t('time.contraction', { count: summary.eventCount })} · ${formatShortDuration(
           summary.averageDurationSeconds,
-        )} avg duration · ${sourceLabel}`;
-  const chipTone = statusTone(status, colors);
+          { t, locale },
+        )} ${t('rhythm.averageDuration')} · ${resolvedSourceLabel}`;
+  const chipTone = statusTone(summary.pattern, colors);
 
   const content = (
     <Card background={background} padding={spacing.md} style={[{ opacity: isDisabled ? 0.62 : 1 }, style]}>
@@ -56,7 +62,7 @@ export function RhythmSummaryRow({
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Headline numberOfLines={1}>{title}</Headline>
+            <Headline numberOfLines={1}>{resolvedTitle}</Headline>
             <View
               style={{
                 borderRadius: radii.pill,
@@ -92,7 +98,7 @@ export function RhythmSummaryRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${value}, ${subtitle}`}
+      accessibilityLabel={`${resolvedTitle}, ${value}, ${subtitle}`}
       accessibilityState={{ disabled: isDisabled }}
       onPress={() => {
         void hapticSelection();
@@ -105,18 +111,16 @@ export function RhythmSummaryRow({
   );
 }
 
-function statusTone(status: string, colors: ReturnType<typeof useTheme>['colors']) {
-  if (status === 'Getting closer') {
-    return { background: colors.systemFill, label: colors.accent };
+function statusTone(pattern: RhythmSummary['pattern'], colors: ReturnType<typeof useTheme>['colors']) {
+  switch (pattern) {
+    case 'getting_closer':
+      return { background: colors.systemFill, label: colors.accent };
+    case 'regular':
+      return { background: colors.tertiarySystemFill, label: colors.success };
+    case 'spacing_out':
+      return { background: colors.tertiarySystemFill, label: colors.warning };
+    case 'inconsistent':
+    case 'insufficient_data':
+      return { background: colors.tertiarySystemFill, label: colors.secondaryLabel };
   }
-  if (status === 'Holding steady') {
-    return { background: colors.tertiarySystemFill, label: colors.success };
-  }
-  if (status === 'Spacing out') {
-    return { background: colors.tertiarySystemFill, label: colors.warning };
-  }
-  if (status === 'Irregular') {
-    return { background: colors.tertiarySystemFill, label: colors.secondaryLabel };
-  }
-  return { background: colors.tertiarySystemFill, label: colors.secondaryLabel };
 }
