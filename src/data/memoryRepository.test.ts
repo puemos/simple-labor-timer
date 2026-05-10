@@ -42,6 +42,18 @@ describe('MemoryRepository session grouping', () => {
     expect(snapshot.allEvents).toHaveLength(1);
   });
 
+  it('keeps a resting active session visible on load before two quiet hours', async () => {
+    const repo = new MemoryRepository();
+    await repo.startContraction('2026-05-10T00:00:00.000Z');
+    await repo.endContraction('2026-05-10T00:01:00.000Z');
+    const snapshot = await repo.loadSnapshot('2026-05-10T02:00:59.000Z');
+
+    expect(snapshot.activeSession?.status).toBe('active');
+    expect(snapshot.latestSession?.status).toBe('active');
+    expect(snapshot.events).toHaveLength(1);
+    expect(snapshot.allEvents).toHaveLength(1);
+  });
+
   it('closes a resting session manually and starts fresh after close', async () => {
     const repo = new MemoryRepository();
     const first = await repo.startContraction('2026-05-10T00:00:00.000Z');
