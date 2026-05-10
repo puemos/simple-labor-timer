@@ -4,6 +4,7 @@ import { Linking, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { hapticImpactLight, hapticWarning } from '@/native/haptics';
 import { urgentTypeLabels } from '@/domain/rules/urgentRules';
+import { formatTimeOnly } from '@/domain/timing/dateFormat';
 import { UrgentType } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
@@ -175,7 +176,7 @@ export default function UrgentRoute() {
                   title={urgentTypeLabels[event.type]}
                   subtitle={event.note}
                   trailing="value"
-                  value={new Date(event.occurredAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  value={formatTimeOnly(event.occurredAt)}
                 />
               ))
             ) : (

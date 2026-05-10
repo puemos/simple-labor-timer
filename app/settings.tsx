@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Switch, View } from 'react-native';
 import { hapticSelection } from '@/native/haptics';
 import { CONTENT_VERSION } from '@/domain/appConstants';
+import { formatDateOnly, normalizeDateOnly } from '@/domain/timing/dateFormat';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Caption1,
@@ -61,7 +62,7 @@ export default function SettingsRoute() {
       doulaName: snapshot.profile.doulaName ?? '',
       doulaPhone: snapshot.profile.doulaPhone ?? '',
       emergencyPhone: snapshot.profile.emergencyPhone,
-      estimatedDueDate: snapshot.profile.estimatedDueDate ?? '',
+      estimatedDueDate: formatDateOnly(snapshot.profile.estimatedDueDate),
       gestationalWeeks:
         snapshot.profile.gestationalAgeAtSetupDays !== undefined
           ? String(Math.floor(snapshot.profile.gestationalAgeAtSetupDays / 7))
@@ -90,7 +91,7 @@ export default function SettingsRoute() {
       doulaName: blank(next.doulaName),
       doulaPhone: blank(next.doulaPhone),
       emergencyPhone: next.emergencyPhone.trim() || '911',
-      estimatedDueDate: blank(next.estimatedDueDate),
+      estimatedDueDate: normalizeDateOnly(next.estimatedDueDate),
       gestationalAgeAtSetupDays: next.gestationalWeeks.trim() ? Math.max(0, Number(next.gestationalWeeks) * 7) : undefined,
       highRiskOrCallEarly: next.highRiskOrCallEarly,
       plannedCesarean: next.plannedCesarean,
@@ -178,7 +179,7 @@ export default function SettingsRoute() {
         <PhoneRow
           title="Due date"
           value={profile.estimatedDueDate}
-          placeholder="YYYY-MM-DD"
+          placeholder="May 10, 2026"
           keyboard="default"
           onCommit={(estimatedDueDate) => commitProfile({ estimatedDueDate })}
         />

@@ -1,6 +1,7 @@
 export { Button } from '@/ui/components/Button';
 export type { ButtonSize, ButtonVariant } from '@/ui/components/Button';
 export { Card } from '@/ui/components/Card';
+export { DateTimeField } from '@/ui/components/DateTimeField';
 export { EmptyState } from '@/ui/components/EmptyState';
 export { IconButton } from '@/ui/components/IconButton';
 export { ListRow } from '@/ui/components/ListRow';

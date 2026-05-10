@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-segmented-control/segmented-control": "^2.5.7",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
