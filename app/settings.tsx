@@ -3,6 +3,11 @@ import { useEffect, useState } from 'react';
 import { Alert, Switch, View } from 'react-native';
 import { hapticSelection } from '@/native/haptics';
 import { CONTENT_VERSION } from '@/domain/appConstants';
+import {
+  applyMockContractionScenario,
+  MOCK_CONTRACTION_SCENARIOS,
+} from '@/dev/mockContractionScenarios';
+import type { MockContractionScenarioKey } from '@/dev/mockContractionScenarios';
 import { formatDateOnly, normalizeDateOnly } from '@/domain/timing/dateFormat';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
@@ -125,6 +130,33 @@ export default function SettingsRoute() {
       durationSeconds: '60',
       windowMinutes: '60',
     });
+  }
+
+  function confirmMockScenario(scenarioKey: MockContractionScenarioKey) {
+    const scenario = MOCK_CONTRACTION_SCENARIOS.find((item) => item.key === scenarioKey);
+    if (!scenario) return;
+    Alert.alert(
+      'Load mock data?',
+      `This replaces local app data with the "${scenario.name}" scenario.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Load',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await applyMockContractionScenario(scenarioKey);
+              await actions.reload();
+            } catch (caught) {
+              Alert.alert(
+                'Mock data failed',
+                caught instanceof Error ? caught.message : 'The mock scenario could not be loaded.',
+              );
+            }
+          },
+        },
+      ],
+    );
   }
 
   const isCustomRule = !rulePresets.slice(0, 3).some((preset) => preset.label === rule.label);
@@ -257,6 +289,23 @@ export default function SettingsRoute() {
           </View>
         ) : null}
       </ListSection>
+
+      {__DEV__ ? (
+        <ListSection
+          header="Mock data"
+          footer="Development only. Loading a scenario replaces local sessions, contractions, urgent events, and profile/rule defaults."
+        >
+          {MOCK_CONTRACTION_SCENARIOS.map((scenario) => (
+            <ListRow
+              key={scenario.key}
+              title={scenario.name}
+              subtitle={scenario.description}
+              trailing="chevron"
+              onPress={() => confirmMockScenario(scenario.key)}
+            />
+          ))}
+        </ListSection>
+      ) : null}
 
       <ListSection header="Privacy" footer="All data stays on this device unless you choose to share it.">
         <ListRow
