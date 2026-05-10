@@ -1,11 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
+import { formatDateTime, formatEditableDateTime, normalizeDateTimeToIso } from '@/domain/timing/dateFormat';
 import { eventDurationSeconds, eventIntervalSeconds, formatShortDuration, nowIso, visibleEvents } from '@/domain/timing/timeMath';
 import { Intensity } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Button,
+  DateTimeField,
   EmptyState,
   Footnote,
   IconButton,
@@ -30,18 +32,29 @@ export default function HistoryDetailRoute() {
   const { spacing } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { actions, busy, snapshot } = useContractionApp();
-  const events = useMemo(() => visibleEvents(snapshot?.events ?? []), [snapshot?.events]);
+  const events = useMemo(() => visibleEvents(snapshot?.allEvents ?? []), [snapshot?.allEvents]);
   const event = events.find((item) => item.id === id);
-  const previous = event ? events[events.indexOf(event) - 1] : undefined;
-  const eventIndex = event ? events.indexOf(event) : -1;
+  const sessionEvents = event ? events.filter((item) => item.sessionId === event.sessionId) : [];
+  const eventIndex = event ? sessionEvents.indexOf(event) : -1;
+  const previous = eventIndex > 0 ? sessionEvents[eventIndex - 1] : undefined;
 
   const [draft, setDraft] = useState(() =>
-    event ? { startAt: event.startAt, endAt: event.endAt ?? nowIso(), note: event.note ?? '' } : { startAt: '', endAt: '', note: '' },
+    event
+      ? {
+          startAt: formatEditableDateTime(event.startAt),
+          endAt: formatEditableDateTime(event.endAt ?? nowIso()),
+          note: event.note ?? '',
+        }
+      : { startAt: '', endAt: '', note: '' },
   );
 
   useEffect(() => {
     if (event) {
-      setDraft({ startAt: event.startAt, endAt: event.endAt ?? nowIso(), note: event.note ?? '' });
+      setDraft({
+        startAt: formatEditableDateTime(event.startAt),
+        endAt: formatEditableDateTime(event.endAt ?? nowIso()),
+        note: event.note ?? '',
+      });
     }
   }, [event]);
 
@@ -60,8 +73,8 @@ export default function HistoryDetailRoute() {
   async function save() {
     if (!event) return;
     await actions.updateEvent(event.id, {
-      startAt: normalizeIso(draft.startAt),
-      endAt: normalizeIso(draft.endAt),
+      startAt: normalizeDateTimeToIso(draft.startAt),
+      endAt: normalizeDateTimeToIso(draft.endAt),
       note: draft.note,
     });
     router.back();
@@ -77,7 +90,7 @@ export default function HistoryDetailRoute() {
       <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.sm, marginBottom: spacing.base }}>
         <Title3>Contraction #{eventIndex + 1}</Title3>
         <Footnote color="secondary" style={{ marginTop: 2 }}>
-          {new Date(event.startAt).toLocaleString()}
+          {formatDateTime(event.startAt)}
         </Footnote>
       </View>
 
@@ -99,18 +112,8 @@ export default function HistoryDetailRoute() {
 
       <ListSection header="Edit">
         <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm, gap: spacing.sm }}>
-          <TextField
-            label="Start"
-            value={draft.startAt}
-            onChangeText={(startAt) => setDraft((value) => ({ ...value, startAt }))}
-            autoCapitalize="none"
-          />
-          <TextField
-            label="End"
-            value={draft.endAt}
-            onChangeText={(endAt) => setDraft((value) => ({ ...value, endAt }))}
-            autoCapitalize="none"
-          />
+          <DateTimeField label="Start" value={draft.startAt} onChangeText={(startAt) => setDraft((value) => ({ ...value, startAt }))} />
+          <DateTimeField label="End" value={draft.endAt} onChangeText={(endAt) => setDraft((value) => ({ ...value, endAt }))} />
           <TextField
             label="Note"
             value={draft.note}
@@ -141,7 +144,7 @@ export default function HistoryDetailRoute() {
           destructive
           centerTitle
           onPress={() =>
-            Alert.alert('Delete contraction?', 'You can restore the most recent deletion in this session.', [
+            Alert.alert('Delete contraction?', 'You can restore the most recent deletion from History.', [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Delete',
@@ -157,9 +160,4 @@ export default function HistoryDetailRoute() {
       </ListSection>
     </Screen>
   );
-}
-
-function normalizeIso(value: string): string {
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
 }

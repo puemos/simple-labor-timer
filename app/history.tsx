@@ -3,19 +3,22 @@ import { useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { hapticSelection } from '@/native/haptics';
+import { formatEditableDateTime, formatTimeOnly, normalizeDateTimeToIso } from '@/domain/timing/dateFormat';
+import { buildRhythmSummary, defaultRhythmSelectedEventId } from '@/domain/timing/rhythm';
 import { eventDurationSeconds, eventIntervalSeconds, eventRestGapSeconds, formatShortDuration, visibleEvents } from '@/domain/timing/timeMath';
-import { ContractionEvent } from '@/domain/types';
+import { ContractionEvent, ContractionSession } from '@/domain/types';
 import { useContractionApp } from '@/state/useContractionStore';
 import {
   Button,
+  DateTimeField,
   EmptyState,
   Headline,
   IconButton,
   ListRow,
   ListSection,
+  RhythmSummaryRow,
   Screen,
   Subhead,
-  TextField,
 } from '@/ui/components';
 import { Icons, ICON_STROKE_WIDTH } from '@/ui/icons';
 import { useTheme } from '@/ui/theme';
@@ -26,11 +29,27 @@ type DayBucket = {
   events: { event: ContractionEvent; index: number; previous?: ContractionEvent }[];
 };
 
+type SessionBucket = {
+  key: string;
+  label: string;
+  days: DayBucket[];
+};
+
 export default function HistoryRoute() {
   const { colors, spacing } = useTheme();
   const { actions, busy, now, snapshot } = useContractionApp();
-  const events = useMemo(() => visibleEvents(snapshot?.events ?? []), [snapshot?.events]);
-  const buckets = useMemo(() => groupByDay(events), [events]);
+  const events = useMemo(() => visibleEvents(snapshot?.allEvents ?? []), [snapshot?.allEvents]);
+  const buckets = useMemo(() => groupBySession(snapshot?.sessions ?? [], events), [events, snapshot?.sessions]);
+  const rhythmSession = snapshot?.activeSession ?? snapshot?.latestSession;
+  const rhythmEvents = useMemo(
+    () => (rhythmSession ? events.filter((event) => event.sessionId === rhythmSession.id) : []),
+    [events, rhythmSession],
+  );
+  const rhythmNow = rhythmSession?.endedAt ?? now;
+  const rhythmSummary = useMemo(
+    () => buildRhythmSummary(rhythmEvents, rhythmNow, { rangeStartAt: rhythmSession?.startedAt, rangeEndAt: rhythmNow }),
+    [rhythmNow, rhythmEvents, rhythmSession?.startedAt],
+  );
   const [missedOpen, setMissedOpen] = useState(false);
 
   return (
@@ -48,6 +67,27 @@ export default function HistoryRoute() {
         </View>
       }
     >
+      {rhythmEvents.length > 0 && rhythmSession ? (
+        <View style={{ paddingHorizontal: spacing.base, marginBottom: spacing.lg }}>
+          <RhythmSummaryRow
+            title="Latest rhythm"
+            summary={rhythmSummary}
+            disabled={rhythmSummary.eventCount < 2}
+            background="grouped"
+            sourceLabel="Session"
+            onPress={() =>
+              router.push({
+                pathname: '/rhythm',
+                params: {
+                  sessionId: rhythmSession.id,
+                  selectedEventId: defaultRhythmSelectedEventId(rhythmSummary),
+                },
+              })
+            }
+          />
+        </View>
+      ) : null}
+
       {events.length === 0 ? (
         <EmptyState
           icon={Icons.History}
@@ -55,29 +95,36 @@ export default function HistoryRoute() {
           body="Once you've ended a contraction, it'll appear here for review."
         />
       ) : (
-        buckets.map((bucket) => (
-          <ListSection key={bucket.key} header={bucket.label}>
-            {bucket.events.map(({ event, index, previous }) => (
-              <SwipeableRow
-                key={event.id}
-                onDelete={() =>
-                  Alert.alert('Delete contraction?', 'You can restore the most recent deletion in this session.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => actions.deleteEvent(event.id) },
-                  ])
-                }
-                onEdit={() => router.push({ pathname: '/history/[id]', params: { id: event.id } })}
-              >
-                <ListRow
-                  title={`#${index + 1} · ${formatTime(event.startAt)}`}
-                  subtitle={buildSubtitle(event, previous, now)}
-                  trailing="chevron"
-                  onPress={() => router.push({ pathname: '/history/[id]', params: { id: event.id } })}
-                />
-              </SwipeableRow>
-            ))}
-          </ListSection>
-        ))
+        buckets.flatMap((session) =>
+          session.days.map((bucket, dayIndex) => (
+            <ListSection key={`${session.key}:${bucket.key}`} header={dayIndex === 0 ? session.label : bucket.label}>
+              {dayIndex === 0 && bucket.label !== session.label ? (
+                <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.xs }}>
+                  <Subhead color="secondary">{bucket.label}</Subhead>
+                </View>
+              ) : null}
+              {bucket.events.map(({ event, index, previous }) => (
+                <SwipeableRow
+                  key={event.id}
+                  onDelete={() =>
+                    Alert.alert('Delete contraction?', 'You can restore the most recent deletion from History.', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => actions.deleteEvent(event.id) },
+                    ])
+                  }
+                  onEdit={() => router.push({ pathname: '/history/[id]', params: { id: event.id } })}
+                >
+                  <ListRow
+                    title={`#${index + 1} · ${formatTime(event.startAt)}`}
+                    subtitle={buildSubtitle(event, previous, now)}
+                    trailing="chevron"
+                    onPress={() => router.push({ pathname: '/history/[id]', params: { id: event.id } })}
+                  />
+                </SwipeableRow>
+              ))}
+            </ListSection>
+          )),
+        )
       )}
 
       {missedOpen ? (
@@ -94,7 +141,7 @@ export default function HistoryRoute() {
       {events.length > 0 ? (
         <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.sm }}>
           <Subhead color="secondary" style={{ textAlign: 'center' }}>
-            {events.length} {events.length === 1 ? 'contraction' : 'contractions'} in this session
+            {events.length} {events.length === 1 ? 'contraction' : 'contractions'} total
           </Subhead>
         </View>
       ) : null}
@@ -117,8 +164,8 @@ function MissedSheet({
 }) {
   const { colors, spacing } = useTheme();
   const defaults = useMemo(() => {
-    const end = new Date(Date.now() - 60_000).toISOString();
-    const start = new Date(Date.now() - 2 * 60_000).toISOString();
+    const end = formatEditableDateTime(Date.now() - 60_000);
+    const start = formatEditableDateTime(Date.now() - 2 * 60_000);
     return { start, end };
   }, []);
   const [start, setStart] = useState(defaults.start);
@@ -134,15 +181,15 @@ function MissedSheet({
       }}
     >
       <Headline>Add missed contraction</Headline>
-      <TextField label="Start (ISO)" value={start} onChangeText={setStart} autoCapitalize="none" />
-      <TextField label="End (ISO)" value={end} onChangeText={setEnd} autoCapitalize="none" />
+      <DateTimeField label="Start" value={start} onChangeText={setStart} />
+      <DateTimeField label="End" value={end} onChangeText={setEnd} />
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <Button variant="gray" label="Cancel" onPress={onClose} fullWidth style={{ flex: 1 }} />
         <Button
           variant="filled"
           label="Add"
           loading={busy}
-          onPress={() => onAdd(normalizeIso(start), normalizeIso(end))}
+          onPress={() => onAdd(normalizeDateTimeToIso(start), normalizeDateTimeToIso(end))}
           fullWidth
           style={{ flex: 1 }}
         />
@@ -202,6 +249,32 @@ function SwipeableRow({
   );
 }
 
+function groupBySession(sessions: ContractionSession[], events: ContractionEvent[]): SessionBucket[] {
+  const knownSessions = sessions.filter((session) => events.some((event) => event.sessionId === session.id));
+  const missingSessions = Array.from(new Set(events.map((event) => event.sessionId)))
+    .filter((sessionId) => !knownSessions.some((session) => session.id === sessionId))
+    .map((sessionId) => {
+      const firstEvent = events.find((event) => event.sessionId === sessionId);
+      return {
+        id: sessionId,
+        startedAt: firstEvent?.startAt ?? new Date().toISOString(),
+        status: 'closed' as const,
+        contentVersion: '',
+        createdAt: firstEvent?.createdAt ?? new Date().toISOString(),
+        updatedAt: firstEvent?.updatedAt ?? new Date().toISOString(),
+      };
+    });
+
+  return [...knownSessions, ...missingSessions].map((session) => {
+    const sessionEvents = events.filter((event) => event.sessionId === session.id);
+    return {
+      key: session.id,
+      label: formatSessionLabel(session, sessionEvents),
+      days: groupByDay(sessionEvents),
+    };
+  });
+}
+
 function groupByDay(events: ContractionEvent[]): DayBucket[] {
   const reversed = [...events].reverse();
   const today = startOfLocalDay(new Date());
@@ -232,6 +305,32 @@ function groupByDay(events: ContractionEvent[]): DayBucket[] {
   return Array.from(map.values());
 }
 
+function formatSessionLabel(session: ContractionSession, events: ContractionEvent[]): string {
+  if (session.status === 'active') {
+    return 'Current session';
+  }
+  const count = events.length;
+  const endAt = session.endedAt ?? events.at(-1)?.endAt ?? events.at(-1)?.startAt;
+  const start = new Date(session.startedAt);
+  const end = endAt ? new Date(endAt) : undefined;
+  const range = end
+    ? `${formatSessionEndpoint(start, true)} - ${formatSessionEndpoint(end, !sameLocalDay(start, end))}`
+    : formatSessionEndpoint(start, true);
+  return `${range} · ${count} ${count === 1 ? 'contraction' : 'contractions'}`;
+}
+
+function formatSessionEndpoint(date: Date, includeDate: boolean): string {
+  const time = formatTimeOnly(date);
+  if (!includeDate) {
+    return time;
+  }
+  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+function sameLocalDay(first: Date, second: Date): boolean {
+  return startOfLocalDay(first).getTime() === startOfLocalDay(second).getTime();
+}
+
 function startOfLocalDay(date: Date): Date {
   const local = new Date(date);
   local.setHours(0, 0, 0, 0);
@@ -239,7 +338,7 @@ function startOfLocalDay(date: Date): Date {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatTimeOnly(iso);
 }
 
 function buildSubtitle(event: ContractionEvent, previous: ContractionEvent | undefined, now: string): string {
@@ -248,9 +347,3 @@ function buildSubtitle(event: ContractionEvent, previous: ContractionEvent | und
   const rest = formatShortDuration(eventRestGapSeconds(event, previous));
   return `${duration} · ${interval} · ${rest}`;
 }
-
-function normalizeIso(value: string): string {
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
-}
-

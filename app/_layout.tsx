@@ -31,6 +31,15 @@ function RootShell() {
           <Stack.Screen name="timer" />
           <Stack.Screen name="history" />
           <Stack.Screen name="history/[id]" />
+          <Stack.Screen
+            name="rhythm"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.7, 1.0],
+              sheetGrabberVisible: true,
+              animation: 'slide_from_bottom',
+            }}
+          />
           <Stack.Screen name="settings" />
           <Stack.Screen
             name="share"
