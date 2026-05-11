@@ -1,15 +1,31 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, mkdtemp, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+
+type ScreenshotTargetId = 'iphone-6.5' | 'iphone-6.9';
+
+type ScreenshotTarget = {
+  id: ScreenshotTargetId;
+  width: number;
+  height: number;
+  outputFolder: string;
+};
+
+type OutputDirs = {
+  root: string;
+  raw: string;
+  promo: string;
+};
 
 type CliOptions = {
   bundleId?: string;
   device?: string;
   scheme?: string;
   skipBuild: boolean;
+  target?: ScreenshotTargetId;
 };
 
 type CommandResult = {
@@ -40,14 +56,49 @@ type Shot = {
 };
 
 const repoRoot = process.cwd();
-const outputRoot = path.join(repoRoot, 'metadata/screenshots/en-US/ios/iphone-6.9');
-const rawDir = path.join(outputRoot, 'raw');
-const promoDir = path.join(outputRoot, 'promo');
-const outputWidth = 1320;
-const outputHeight = 2868;
+const iosScreenshotRoot = path.join(repoRoot, 'metadata/screenshots/en-US/ios');
+const defaultTargetId: ScreenshotTargetId = 'iphone-6.5';
+const screenshotTargets: Record<ScreenshotTargetId, ScreenshotTarget> = {
+  'iphone-6.5': {
+    id: 'iphone-6.5',
+    width: 1284,
+    height: 2778,
+    outputFolder: 'iphone-6.5',
+  },
+  'iphone-6.9': {
+    id: 'iphone-6.9',
+    width: 1320,
+    height: 2868,
+    outputFolder: 'iphone-6.9',
+  },
+};
 const defaultDeviceName = 'iPhone 16 Pro Max';
 const defaultPort = 8081;
 const launchSettleMs = 20_000;
+
+const basePromoLayout = {
+  width: 1320,
+  height: 2868,
+  displayWidth: 976,
+  displayHeight: 2121,
+  frameWidth: 1024,
+  frameHeight: 2169,
+  frameX: 148,
+  frameY: 560,
+  displayX: 172,
+  displayY: 584,
+  shadowOffsetY: 18,
+  frameRadius: 98,
+  deviceRadius: 92,
+  innerInset: 15,
+  innerRadius: 78,
+  displayRadius: 66,
+  labelPointSize: 42,
+  labelY: 170,
+  titlePointSize: 82,
+  titleLine1Y: 245,
+  titleLine2Y: 340,
+} as const;
 
 const shots: Shot[] = [
   {
@@ -84,13 +135,16 @@ const shots: Shot[] = [
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  const target = screenshotTargets[options.target ?? defaultTargetId];
+  const outputDirs = getOutputDirs(target);
   const config = readExpoConfig();
 
   await assertTool('xcrun', ['--version']);
   await assertTool('magick', ['-version']);
-  await mkdir(rawDir, { recursive: true });
-  await mkdir(promoDir, { recursive: true });
+  await mkdir(outputDirs.raw, { recursive: true });
+  await mkdir(outputDirs.promo, { recursive: true });
 
+  log(`Using screenshot target ${target.id} (${target.width} x ${target.height})`);
   const device = await findDevice(options.device ?? defaultDeviceName);
   log(`Using simulator ${device.name} (${device.udid})`);
   await bootDevice(device.udid);
@@ -127,16 +181,16 @@ async function main() {
     const scheme = await launchDevClient(device.udid, schemeCandidates, port, bundleId);
 
     for (const shot of shots) {
-      await captureShot(device.udid, scheme, shot, tempDir);
+      await captureShot(device.udid, scheme, shot, tempDir, target, outputDirs);
     }
 
     for (const shot of shots) {
-      await composePromo(shot, tempDir);
+      await composePromo(shot, tempDir, target, outputDirs);
     }
 
-    await verifyOutputs();
-    log(`Saved raw screenshots to ${rawDir}`);
-    log(`Saved promo screenshots to ${promoDir}`);
+    await verifyOutputs(target, outputDirs);
+    log(`Saved raw screenshots to ${outputDirs.raw}`);
+    log(`Saved promo screenshots to ${outputDirs.promo}`);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
     await stopMetro(metro);
@@ -162,6 +216,9 @@ function parseArgs(args: string[]): CliOptions {
       case '--scheme':
         options.scheme = requireValue(args, ++index, arg);
         break;
+      case '--target':
+        options.target = parseTarget(requireValue(args, ++index, arg));
+        break;
       case '--help':
       case '-h':
         printHelp();
@@ -173,6 +230,18 @@ function parseArgs(args: string[]): CliOptions {
   return options;
 }
 
+function parseTarget(value: string): ScreenshotTargetId {
+  if (isScreenshotTargetId(value)) {
+    return value;
+  }
+
+  throw new Error(`--target must be one of: ${Object.keys(screenshotTargets).join(', ')}`);
+}
+
+function isScreenshotTargetId(value: string): value is ScreenshotTargetId {
+  return Object.prototype.hasOwnProperty.call(screenshotTargets, value);
+}
+
 function requireValue(args: string[], index: number, flag: string): string {
   const value = args[index];
   if (!value || value.startsWith('--')) {
@@ -182,15 +251,29 @@ function requireValue(args: string[], index: number, flag: string): string {
 }
 
 function printHelp() {
-  console.log(`Usage: pnpm screenshots:ios [-- --skip-build] [-- --device <udid-or-name>] [-- --bundle-id <id>] [-- --scheme <scheme>]
+  console.log(`Usage: pnpm screenshots:ios [-- --target iphone-6.5|iphone-6.9] [-- --skip-build] [-- --device <udid-or-name>] [-- --bundle-id <id>] [-- --scheme <scheme>]
 
-Captures separated raw simulator screenshots and framed 1320 x 2868 promo PNGs for App Store Connect.
+Captures separated raw simulator screenshots and framed promo PNGs for App Store Connect.
+
+Targets:
+  iphone-6.5       1284 x 2778 output for the App Store Connect 6.5" slot. Default.
+  iphone-6.9       1320 x 2868 output for the App Store Connect 6.9" slot.
 
 Options:
+  --target <value>  Screenshot target. Defaults to "${defaultTargetId}".
   --skip-build       Use the app already installed on the simulator.
   --device <value>   Simulator UDID or name. Defaults to "${defaultDeviceName}".
   --bundle-id <id>   Installed app bundle id override.
   --scheme <scheme>  URL scheme override for dev-client and shot deep links.`);
+}
+
+function getOutputDirs(target: ScreenshotTarget): OutputDirs {
+  const root = path.join(iosScreenshotRoot, target.outputFolder);
+  return {
+    root,
+    raw: path.join(root, 'raw'),
+    promo: path.join(root, 'promo'),
+  };
 }
 
 function readExpoConfig(): ExpoConfig {
@@ -398,15 +481,23 @@ async function launchDevClient(
   throw new Error(`Could not open the dev client with any URL scheme: ${schemeCandidates.join(', ')}`);
 }
 
-async function captureShot(udid: string, scheme: string, shot: Shot, tempDir: string) {
+async function captureShot(
+  udid: string,
+  scheme: string,
+  shot: Shot,
+  tempDir: string,
+  target: ScreenshotTarget,
+  outputDirs: OutputDirs,
+) {
   log(`Capturing ${shot.fileName}`);
   const shotUrl = `${scheme}://?shot=${encodeURIComponent(shot.key)}`;
   await run('xcrun', ['simctl', 'openurl', udid, shotUrl]);
   await sleep(shot.settleMs);
 
-  const rawPath = path.join(rawDir, shot.fileName);
-  await run('xcrun', ['simctl', 'io', udid, 'screenshot', rawPath]);
-  await flattenPng(rawPath, path.join(tempDir, `${shot.key}-raw.png`));
+  const nativePath = path.join(tempDir, `${shot.key}-native.png`);
+  const rawPath = path.join(outputDirs.raw, shot.fileName);
+  await run('xcrun', ['simctl', 'io', udid, 'screenshot', nativePath]);
+  await normalizeScreenshotPng(nativePath, rawPath, target);
 }
 
 async function foregroundApp(udid: string, bundleId?: string) {
@@ -414,38 +505,54 @@ async function foregroundApp(udid: string, bundleId?: string) {
   await run('xcrun', ['simctl', 'launch', udid, bundleId], { allowFailure: true, quiet: true });
 }
 
-async function flattenPng(filePath: string, tempPath: string) {
-  await run('magick', [filePath, '-alpha', 'off', '-colorspace', 'sRGB', `PNG24:${tempPath}`], { quiet: true });
-  await rename(tempPath, filePath);
+async function normalizeScreenshotPng(inputPath: string, outputPath: string, target: ScreenshotTarget) {
+  await run(
+    'magick',
+    [
+      inputPath,
+      '-background',
+      'white',
+      '-alpha',
+      'remove',
+      '-alpha',
+      'off',
+      '-colorspace',
+      'sRGB',
+      '-resize',
+      `${target.width}x${target.height}^`,
+      '-gravity',
+      'center',
+      '-extent',
+      `${target.width}x${target.height}`,
+      '-strip',
+      `PNG24:${outputPath}`,
+    ],
+    { quiet: true },
+  );
 }
 
-async function composePromo(shot: Shot, tempDir: string) {
+async function composePromo(shot: Shot, tempDir: string, target: ScreenshotTarget, outputDirs: OutputDirs) {
   log(`Composing ${shot.fileName}`);
-  const rawPath = path.join(rawDir, shot.fileName);
-  const promoPath = path.join(promoDir, shot.fileName);
+  const rawPath = path.join(outputDirs.raw, shot.fileName);
+  const promoPath = path.join(outputDirs.promo, shot.fileName);
   const resizedPath = path.join(tempDir, `${shot.key}-resized.png`);
   const maskPath = path.join(tempDir, `${shot.key}-mask.png`);
   const displayPath = path.join(tempDir, `${shot.key}-display.png`);
+  const layout = getPromoLayout(target);
 
-  const displayWidth = 976;
-  const displayHeight = 2121;
-  const frameWidth = 1024;
-  const frameHeight = 2169;
-  const frameX = 148;
-  const frameY = 560;
-  const displayX = 172;
-  const displayY = 584;
+  const innerWidth = layout.frameWidth - layout.innerInset * 2;
+  const innerHeight = layout.frameHeight - layout.innerInset * 2;
 
   await run(
     'magick',
     [
       rawPath,
       '-resize',
-      `${displayWidth}x${displayHeight}^`,
+      `${layout.displayWidth}x${layout.displayHeight}^`,
       '-gravity',
       'center',
       '-extent',
-      `${displayWidth}x${displayHeight}`,
+      `${layout.displayWidth}x${layout.displayHeight}`,
       resizedPath,
     ],
     { quiet: true },
@@ -454,12 +561,12 @@ async function composePromo(shot: Shot, tempDir: string) {
     'magick',
     [
       '-size',
-      `${displayWidth}x${displayHeight}`,
+      `${layout.displayWidth}x${layout.displayHeight}`,
       'xc:none',
       '-fill',
       'white',
       '-draw',
-      `roundrectangle 0,0 ${displayWidth - 1},${displayHeight - 1} 66,66`,
+      `roundrectangle 0,0 ${layout.displayWidth - 1},${layout.displayHeight - 1} ${layout.displayRadius},${layout.displayRadius}`,
       maskPath,
     ],
     { quiet: true },
@@ -481,76 +588,76 @@ async function composePromo(shot: Shot, tempDir: string) {
     'magick',
     [
       '-size',
-      `${outputWidth}x${outputHeight}`,
+      `${target.width}x${target.height}`,
       'xc:#F7EFE7',
       '(',
       '-size',
-      `${frameWidth}x${frameHeight}`,
+      `${layout.frameWidth}x${layout.frameHeight}`,
       'xc:none',
       '-fill',
       'rgba(80,57,43,0.18)',
       '-draw',
-      `roundrectangle 0,0 ${frameWidth - 1},${frameHeight - 1} 98,98`,
+      `roundrectangle 0,0 ${layout.frameWidth - 1},${layout.frameHeight - 1} ${layout.frameRadius},${layout.frameRadius}`,
       ')',
       '-geometry',
-      `+${frameX}+${frameY + 18}`,
+      `+${layout.frameX}+${layout.frameY + layout.shadowOffsetY}`,
       '-compose',
       'over',
       '-composite',
       '(',
       '-size',
-      `${frameWidth}x${frameHeight}`,
+      `${layout.frameWidth}x${layout.frameHeight}`,
       'xc:none',
       '-fill',
       '#1C1714',
       '-draw',
-      `roundrectangle 0,0 ${frameWidth - 1},${frameHeight - 1} 92,92`,
+      `roundrectangle 0,0 ${layout.frameWidth - 1},${layout.frameHeight - 1} ${layout.deviceRadius},${layout.deviceRadius}`,
       ')',
       '-geometry',
-      `+${frameX}+${frameY}`,
+      `+${layout.frameX}+${layout.frameY}`,
       '-compose',
       'over',
       '-composite',
       '(',
       '-size',
-      `${frameWidth - 30}x${frameHeight - 30}`,
+      `${innerWidth}x${innerHeight}`,
       'xc:none',
       '-fill',
       '#FAF3EC',
       '-draw',
-      `roundrectangle 0,0 ${frameWidth - 31},${frameHeight - 31} 78,78`,
+      `roundrectangle 0,0 ${innerWidth - 1},${innerHeight - 1} ${layout.innerRadius},${layout.innerRadius}`,
       ')',
       '-geometry',
-      `+${frameX + 15}+${frameY + 15}`,
+      `+${layout.frameX + layout.innerInset}+${layout.frameY + layout.innerInset}`,
       '-compose',
       'over',
       '-composite',
       displayPath,
       '-geometry',
-      `+${displayX}+${displayY}`,
+      `+${layout.displayX}+${layout.displayY}`,
       '-compose',
       'over',
       '-composite',
       ...(labelFont ? ['-font', labelFont] : []),
       '-pointsize',
-      '42',
+      String(layout.labelPointSize),
       '-fill',
       '#7C5B45',
       '-gravity',
       'North',
       '-annotate',
-      '+0+170',
+      `+0+${layout.labelY}`,
       'SIMPLE LABOR TIMER',
       ...(titleFont ? ['-font', titleFont] : []),
       '-pointsize',
-      '82',
+      String(layout.titlePointSize),
       '-fill',
       '#211714',
       '-annotate',
-      '+0+245',
+      `+0+${layout.titleLine1Y}`,
       shot.caption[0],
       '-annotate',
-      '+0+340',
+      `+0+${layout.titleLine2Y}`,
       shot.caption[1],
       '-strip',
       `PNG24:${promoPath}`,
@@ -559,8 +666,39 @@ async function composePromo(shot: Shot, tempDir: string) {
   );
 }
 
-async function verifyOutputs() {
-  for (const folder of [rawDir, promoDir]) {
+function getPromoLayout(target: ScreenshotTarget) {
+  const scaleX = target.width / basePromoLayout.width;
+  const scaleY = target.height / basePromoLayout.height;
+  const scale = Math.min(scaleX, scaleY);
+  const x = (value: number) => Math.round(value * scaleX);
+  const y = (value: number) => Math.round(value * scaleY);
+  const size = (value: number) => Math.max(1, Math.round(value * scale));
+
+  return {
+    displayWidth: x(basePromoLayout.displayWidth),
+    displayHeight: y(basePromoLayout.displayHeight),
+    frameWidth: x(basePromoLayout.frameWidth),
+    frameHeight: y(basePromoLayout.frameHeight),
+    frameX: x(basePromoLayout.frameX),
+    frameY: y(basePromoLayout.frameY),
+    displayX: x(basePromoLayout.displayX),
+    displayY: y(basePromoLayout.displayY),
+    shadowOffsetY: y(basePromoLayout.shadowOffsetY),
+    frameRadius: size(basePromoLayout.frameRadius),
+    deviceRadius: size(basePromoLayout.deviceRadius),
+    innerInset: size(basePromoLayout.innerInset),
+    innerRadius: size(basePromoLayout.innerRadius),
+    displayRadius: size(basePromoLayout.displayRadius),
+    labelPointSize: size(basePromoLayout.labelPointSize),
+    labelY: y(basePromoLayout.labelY),
+    titlePointSize: size(basePromoLayout.titlePointSize),
+    titleLine1Y: y(basePromoLayout.titleLine1Y),
+    titleLine2Y: y(basePromoLayout.titleLine2Y),
+  };
+}
+
+async function verifyOutputs(target: ScreenshotTarget, outputDirs: OutputDirs) {
+  for (const folder of [outputDirs.raw, outputDirs.promo]) {
     for (const shot of shots) {
       const filePath = path.join(folder, shot.fileName);
       const file = await stat(filePath);
@@ -574,7 +712,7 @@ async function verifyOutputs() {
         { quiet: true },
       );
       const [format, width, height, colorspace, type] = identify.stdout.trim().split(/\s+/);
-      if (format !== 'PNG' || Number(width) !== outputWidth || Number(height) !== outputHeight) {
+      if (format !== 'PNG' || Number(width) !== target.width || Number(height) !== target.height) {
         throw new Error(`Unexpected screenshot geometry for ${filePath}: ${identify.stdout}`);
       }
       if (!['RGB', 'sRGB'].includes(colorspace) || !type.startsWith('TrueColor')) {

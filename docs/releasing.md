@@ -38,6 +38,14 @@ pnpm run release:submit:android
 pnpm run release:submit:ios
 ```
 
+Generate iOS App Store screenshots locally before uploading metadata. The default target is the 6.5-inch App Store Connect slot:
+
+```sh
+pnpm run screenshots:ios -- --target iphone-6.5
+```
+
+Upload the PNGs from `metadata/screenshots/en-US/ios/iphone-6.5/promo` to the iPhone 6.5" screenshot slot. Use `--target iphone-6.9` only when preparing screenshots for the separate 6.9" slot.
+
 To publish after account setup is complete:
 
 ```sh

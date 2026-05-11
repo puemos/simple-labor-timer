@@ -1,4 +1,5 @@
 import type { Href } from 'expo-router';
+import { LogBox } from 'react-native';
 import { applyMockContractionScenario } from '@/dev/mockContractionScenarios';
 import type { MockContractionScenarioKey } from '@/dev/mockContractionScenarios';
 import { useContractionStore } from '@/state/useContractionStore';
@@ -46,6 +47,7 @@ export async function prepareScreenshotScenario(shot: string): Promise<Href | un
     return undefined;
   }
 
+  LogBox.ignoreAllLogs(true);
   const config = screenshotScenarios[shot];
   await applyMockContractionScenario(config.scenario);
   await useContractionStore.getState().hydrate();
