@@ -323,8 +323,8 @@ export function buildSummaryPdfHtml(input: SummaryExportInput): string {
 </html>`;
 }
 
-export function summaryTextToHtml(text: string): string {
-  const [title = 'Contraction update', ...body] = text.split('\n');
+export function summaryTextToHtml(text: string, options?: LocaleFormatOptions): string {
+  const [title = resolveT(options)('export.title'), ...body] = text.split('\n');
   const escapedTitle = escapeHtml(title);
   const escapedBody = escapeHtml(body.join('\n'));
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"/><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;line-height:1.5;color:#111827;padding:28px}h1{font-size:24px;line-height:1.2;margin:0 0 18px}.content{font-size:15px;white-space:pre-wrap}</style></head><body><h1>${escapedTitle}</h1><div class="content">${escapedBody}</div></body></html>`;
@@ -427,7 +427,7 @@ function callRuleModel(result: ProviderRuleResult | undefined, profile: Pregnanc
 
   return {
     careTeam: profile.careTeamPhone,
-    ruleLabel: result.label,
+    ruleLabel: formatProviderRuleLabel(result.label, options),
     status: result.met ? 'matched' : 'not_matched',
     statusLabel: result.met ? t('export.matchedTitle') : t('export.notMatchedTitle'),
   };
@@ -507,7 +507,7 @@ function callRuleLines(result: ProviderRuleResult | undefined, profile: Pregnanc
   if (!result || result.ruleStatus === 'not_saved') {
     lines.push(t('export.savedRule', { value: t('export.notSaved') }));
   } else {
-    lines.push(t('export.savedRule', { value: result.label }));
+    lines.push(t('export.savedRule', { value: formatProviderRuleLabel(result.label, options) }));
     lines.push(t('export.status', { value: result.met ? t('export.matched') : t('export.notMatched') }));
   }
 
@@ -543,6 +543,10 @@ function formatRecordedDateTime(value: string, options: LocaleFormatOptions): st
 
 function formatIntensity(intensity: Intensity, options: LocaleFormatOptions): string {
   return resolveT(options)(`intensity.${intensity}`);
+}
+
+function formatProviderRuleLabel(label: string, options: LocaleFormatOptions): string {
+  return label || resolveT(options)('common.custom');
 }
 
 function escapeHtml(text: string): string {

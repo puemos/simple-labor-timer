@@ -37,7 +37,7 @@ export class MemoryRepository implements AppRepositoryContract {
       durationSecondsMin: 60,
       observationWindowMinutes: 60,
       label: '5-1-1',
-      actionText: 'Call your care team',
+      actionText: '',
       source: 'app_default',
       createdAt: now,
       updatedAt: now,

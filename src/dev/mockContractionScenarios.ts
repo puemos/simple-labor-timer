@@ -16,22 +16,16 @@ type MockEventTemplate = {
 
 type MockContractionScenarioDefinition = {
   key: string;
-  name: string;
-  description: string;
   events: readonly MockEventTemplate[];
 };
 
 export const MOCK_CONTRACTION_SCENARIOS = [
   {
     key: 'early_data',
-    name: 'Early data',
-    description: 'One timed contraction so rhythm still needs more data.',
     events: [{ startOffsetMinutes: -8, durationSeconds: 55, intensity: 'mild' }],
   },
   {
     key: 'regular_5_1_1',
-    name: 'Regular 5-1-1',
-    description: 'One-minute contractions every five minutes for the saved call rule.',
     events: [
       { startOffsetMinutes: -48, durationSeconds: 65, intensity: 'moderate' },
       { startOffsetMinutes: -43, durationSeconds: 66, intensity: 'moderate' },
@@ -47,8 +41,6 @@ export const MOCK_CONTRACTION_SCENARIOS = [
   },
   {
     key: 'getting_closer',
-    name: 'Getting closer',
-    description: 'Intervals tighten over the session without meeting the call rule yet.',
     events: [
       { startOffsetMinutes: -42, durationSeconds: 55, intensity: 'mild' },
       { startOffsetMinutes: -34, durationSeconds: 56, intensity: 'mild' },
@@ -60,8 +52,6 @@ export const MOCK_CONTRACTION_SCENARIOS = [
   },
   {
     key: 'spacing_out',
-    name: 'Spacing out',
-    description: 'Intervals spread farther apart so the rhythm reads as spacing out.',
     events: [
       { startOffsetMinutes: -42, durationSeconds: 56, intensity: 'moderate' },
       { startOffsetMinutes: -38, durationSeconds: 55, intensity: 'moderate' },
@@ -73,12 +63,10 @@ export const MOCK_CONTRACTION_SCENARIOS = [
   },
   {
     key: 'active_over_2_min',
-    name: 'Active over 2 min',
-    description: 'An active contraction has passed two minutes for urgent-warning testing.',
     events: [
       { startOffsetMinutes: -15, durationSeconds: 60, intensity: 'moderate' },
       { startOffsetMinutes: -8, durationSeconds: 62, intensity: 'moderate' },
-      { startOffsetMinutes: -2.5, active: true, intensity: 'strong', note: 'Active mock contraction' },
+      { startOffsetMinutes: -2.5, active: true, intensity: 'strong' },
     ],
   },
 ] as const satisfies readonly MockContractionScenarioDefinition[];
@@ -87,8 +75,6 @@ export type MockContractionScenarioKey = (typeof MOCK_CONTRACTION_SCENARIOS)[num
 
 export type MaterializedMockContractionScenario = {
   key: MockContractionScenarioKey;
-  name: string;
-  description: string;
   at: string;
   profile: PregnancyProfile;
   providerRule: ProviderRule;
@@ -108,8 +94,6 @@ export function materializeMockContractionScenario(
 
   return {
     key,
-    name: scenario.name,
-    description: scenario.description,
     at,
     profile,
     providerRule: mockProviderRule(profile.id, at),
@@ -211,7 +195,7 @@ function mockProviderRule(profileId: string, at: string): ProviderRule {
     durationSecondsMin: 60,
     observationWindowMinutes: 60,
     label: '5-1-1',
-    actionText: 'Call your care team',
+    actionText: '',
     source: 'app_default',
     createdAt: at,
     updatedAt: at,

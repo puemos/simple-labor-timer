@@ -12,11 +12,13 @@ import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { hapticEnd, hapticStart, hapticWarning } from '@/native/haptics';
 
 type EventPatch = Partial<Pick<ContractionEvent, 'startAt' | 'endAt' | 'intensity' | 'note'>>;
+type AppErrorKey = 'errors.generic' | 'errors.databaseOpen' | 'errors.databaseRefresh';
 
 type ContractionState = {
   loading: boolean;
   busy: boolean;
   error?: string;
+  errorKey?: AppErrorKey;
   now: string;
   snapshot?: AppSnapshot;
   hydrate: () => Promise<void>;
@@ -42,7 +44,7 @@ async function runRepositoryAction(
   set: (patch: Partial<ContractionState>) => void,
   action: () => Promise<AppSnapshot>,
 ) {
-  set({ busy: true, error: undefined });
+  set({ busy: true, error: undefined, errorKey: undefined });
   try {
     const snapshot = await action();
     set({ snapshot, busy: false, now: nowIso() });
@@ -50,7 +52,8 @@ async function runRepositoryAction(
     set({
       busy: false,
       now: nowIso(),
-      error: caught instanceof Error ? caught.message : 'Something went wrong.',
+      error: caught instanceof Error ? caught.message : undefined,
+      errorKey: caught instanceof Error ? undefined : 'errors.generic',
     });
   }
 }
@@ -60,7 +63,7 @@ export const useContractionStore = create<ContractionState>((set) => ({
   busy: false,
   now: nowIso(),
   hydrate: async () => {
-    set({ loading: true, error: undefined });
+    set({ loading: true, error: undefined, errorKey: undefined });
     try {
       const repo = await getAppRepository();
       set({ snapshot: await repo.loadSnapshot(), loading: false, now: nowIso() });
@@ -68,18 +71,20 @@ export const useContractionStore = create<ContractionState>((set) => ({
       set({
         loading: false,
         now: nowIso(),
-        error: caught instanceof Error ? caught.message : 'The local database could not be opened.',
+        error: caught instanceof Error ? caught.message : undefined,
+        errorKey: caught instanceof Error ? undefined : 'errors.databaseOpen',
       });
     }
   },
   refresh: async () => {
     try {
       const repo = await getAppRepository();
-      set({ snapshot: await repo.loadSnapshot(), error: undefined, now: nowIso() });
+      set({ snapshot: await repo.loadSnapshot(), error: undefined, errorKey: undefined, now: nowIso() });
     } catch (caught) {
       set({
         now: nowIso(),
-        error: caught instanceof Error ? caught.message : 'The local database could not be refreshed.',
+        error: caught instanceof Error ? caught.message : undefined,
+        errorKey: caught instanceof Error ? undefined : 'errors.databaseRefresh',
       });
     }
   },
@@ -126,7 +131,9 @@ export function useContractionApp() {
   const { locale } = useAppLanguage();
   const loading = useContractionStore((state) => state.loading);
   const busy = useContractionStore((state) => state.busy);
-  const error = useContractionStore((state) => state.error);
+  const rawError = useContractionStore((state) => state.error);
+  const errorKey = useContractionStore((state) => state.errorKey);
+  const error = rawError ?? (errorKey ? t(errorKey) : undefined);
   const now = useContractionStore((state) => state.now);
   const snapshot = useContractionStore((state) => state.snapshot);
   const activeSessionId = snapshot?.activeSession?.id;

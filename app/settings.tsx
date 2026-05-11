@@ -30,11 +30,13 @@ const themeOptions: { key: ThemePreference; labelKey: string }[] = [
   { key: 'dark', labelKey: 'common.dark' },
 ];
 
-const rulePresets: { label: string; intervalMinutes: string }[] = [
-  { label: '5-1-1', intervalMinutes: '5' },
-  { label: '4-1-1', intervalMinutes: '4' },
-  { label: '3-1-1', intervalMinutes: '3' },
-  { label: 'Custom', intervalMinutes: '' },
+const CUSTOM_RULE_KEY = 'custom';
+
+const rulePresets: { key: string; label: string; intervalMinutes: string }[] = [
+  { key: '5-1-1', label: '5-1-1', intervalMinutes: '5' },
+  { key: '4-1-1', label: '4-1-1', intervalMinutes: '4' },
+  { key: '3-1-1', label: '3-1-1', intervalMinutes: '3' },
+  { key: CUSTOM_RULE_KEY, label: '', intervalMinutes: '' },
 ];
 
 export default function SettingsRoute() {
@@ -80,11 +82,11 @@ export default function SettingsRoute() {
     });
     if (snapshot.providerRule) {
       setRule({
-        label: snapshot.providerRule.label,
+        label: localizedProviderRuleLabel(snapshot.providerRule.label, t),
         intervalMinutes: String(Math.round(snapshot.providerRule.intervalSecondsMax / 60)),
         durationSeconds: String(snapshot.providerRule.durationSecondsMin),
         windowMinutes: String(snapshot.providerRule.observationWindowMinutes),
-        actionText: snapshot.providerRule.actionText,
+        actionText: localizedProviderActionText(snapshot.providerRule.actionText, t),
       });
     }
   }, [locale, snapshot, t]);
@@ -111,20 +113,20 @@ export default function SettingsRoute() {
     setRule(next);
     void hapticSelection();
     await actions.saveProviderRule({
-      label: next.label.trim() || 'Custom',
+      label: providerRuleLabelForStorage(next.label, t),
       intervalSecondsMax: Math.max(1, Number(next.intervalMinutes) || 5) * 60,
       durationSecondsMin: Math.max(1, Number(next.durationSeconds) || 60),
       observationWindowMinutes: Math.max(1, Number(next.windowMinutes) || 60),
-      actionText: next.actionText.trim() || t('settings.callCareTeamAction'),
+      actionText: providerActionTextForStorage(next.actionText, t),
       source: 'user_provider',
     });
   }
 
-  function applyPreset(presetLabel: string) {
-    const preset = rulePresets.find((item) => item.label === presetLabel);
+  function applyPreset(presetKey: string) {
+    const preset = rulePresets.find((item) => item.key === presetKey);
     if (!preset) return;
-    if (preset.label === 'Custom') {
-      void commitRule({ label: 'Custom' });
+    if (preset.key === CUSTOM_RULE_KEY) {
+      void commitRule({ label: t('common.custom') });
       return;
     }
     void commitRule({
@@ -140,7 +142,7 @@ export default function SettingsRoute() {
     if (!scenario) return;
     Alert.alert(
       t('settings.loadMockTitle'),
-      t('settings.loadMockBody', { name: scenario.name }),
+      t('settings.loadMockBody', { name: mockScenarioName(scenario.key, t) }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -163,7 +165,7 @@ export default function SettingsRoute() {
   }
 
   const isCustomRule = !rulePresets.slice(0, 3).some((preset) => preset.label === rule.label);
-  const ruleSegmentValue = isCustomRule ? 'Custom' : rule.label;
+  const ruleSegmentValue = isCustomRule ? CUSTOM_RULE_KEY : rule.label;
 
   return (
     <Screen
@@ -260,12 +262,12 @@ export default function SettingsRoute() {
       >
         <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm }}>
           <SegmentedControl
-            options={rulePresets.map((preset) => ({ key: preset.label, label: preset.label === 'Custom' ? t('common.custom') : preset.label }))}
+            options={rulePresets.map((preset) => ({ key: preset.key, label: preset.label || t('common.custom') }))}
             value={ruleSegmentValue}
             onChange={applyPreset}
           />
         </View>
-        {isCustomRule || rule.label === 'Custom' ? (
+        {isCustomRule ? (
           <View style={{ paddingHorizontal: spacing.base, paddingVertical: spacing.sm, gap: spacing.sm }}>
             <TextField label={t('settings.ruleLabel')} value={rule.label} onChangeText={(label) => setRule((value) => ({ ...value, label }))} onBlur={() => commitRule({})} />
             <TextField
@@ -307,8 +309,8 @@ export default function SettingsRoute() {
           {MOCK_CONTRACTION_SCENARIOS.map((scenario) => (
             <ListRow
               key={scenario.key}
-              title={scenario.name}
-              subtitle={scenario.description}
+              title={mockScenarioName(scenario.key, t)}
+              subtitle={mockScenarioDescription(scenario.key, t)}
               trailing="chevron"
               onPress={() => confirmMockScenario(scenario.key)}
             />
@@ -408,6 +410,32 @@ function showLanguagePicker(
     })),
     { text: t('common.cancel'), style: 'cancel' as const },
   ]);
+}
+
+function mockScenarioName(key: MockContractionScenarioKey, t: AppT): string {
+  return t(`settings.mockScenarios.${key}.name`);
+}
+
+function mockScenarioDescription(key: MockContractionScenarioKey, t: AppT): string {
+  return t(`settings.mockScenarios.${key}.description`);
+}
+
+function localizedProviderActionText(actionText: string, t: AppT): string {
+  return actionText && actionText !== 'Call your care team' ? actionText : t('settings.callCareTeamAction');
+}
+
+function providerActionTextForStorage(actionText: string, t: AppT): string {
+  const trimmed = actionText.trim();
+  return trimmed && trimmed !== t('settings.callCareTeamAction') && trimmed !== 'Call your care team' ? trimmed : '';
+}
+
+function localizedProviderRuleLabel(label: string, t: AppT): string {
+  return label && label !== 'Custom' ? label : t('common.custom');
+}
+
+function providerRuleLabelForStorage(label: string, t: AppT): string {
+  const trimmed = label.trim();
+  return trimmed && trimmed !== t('common.custom') && trimmed !== 'Custom' ? trimmed : '';
 }
 
 function blank(value: string): string | undefined {

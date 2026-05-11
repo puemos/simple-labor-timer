@@ -50,17 +50,6 @@ export function evaluateUrgentRules(
   return { active: false, sourceIds: [] };
 }
 
-export const urgentTypeLabels: Record<NonNullable<UrgentRuleResult['type']>, string> = {
-  water_broke: 'Waters broke',
-  vaginal_bleeding: 'Vaginal bleeding',
-  reduced_fetal_movement: 'Baby moving less than usual',
-  under_37_weeks_labor_concern: 'Under 37 weeks and labor concern',
-  contraction_over_2_min: 'Contraction over 2 minutes',
-  severe_or_unusual_pain: 'Severe or unusual pain',
-  fever_unwell: 'Fever or feeling very unwell',
-  planned_c_section_or_call_early: 'Planned C-section or call early',
-};
-
 export function urgentTypeLabel(type: NonNullable<UrgentRuleResult['type']>, options?: LocaleFormatOptions): string {
   return resolveT(options)(`urgentTypes.${type}`);
 }
