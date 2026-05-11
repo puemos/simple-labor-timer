@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveT, setActiveLocale } from '@/i18n/format';
+import machineTranslations from '@/i18n/machineTranslations.json';
 import { resources, rtlLocales, supportedLocales } from '@/i18n/resources';
 
 describe('i18n resources', () => {
@@ -9,6 +10,23 @@ describe('i18n resources', () => {
     supportedLocales.forEach((locale) => {
       expect(flattenKeys(resources[locale].translation)).toEqual(englishKeys);
     });
+  });
+
+  it('ships generated translations for every source key before fallback is applied', () => {
+    const englishKeys = flattenKeys(resources.en.translation);
+    const generated = machineTranslations as Record<string, unknown>;
+
+    supportedLocales.forEach((locale) => {
+      expect(flattenKeys(generated[locale]), locale).toEqual(englishKeys);
+    });
+  });
+
+  it('keeps the timer tap hints translated in Italian', () => {
+    const english = resolveT({ locale: 'en' })('timer.tapToStart');
+    const italian = resolveT({ locale: 'it' })('timer.tapToStart');
+
+    expect(italian).toBe('Tocca un punto qualsiasi per avviare il cronometraggio');
+    expect(italian).not.toBe(english);
   });
 
   it('formats plural contraction counts in English and Italian', () => {
