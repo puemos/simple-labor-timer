@@ -74,68 +74,75 @@ export default function RhythmRoute() {
 
   return (
     <Sheet background="grouped">
-      <View
-        collapsable={false}
-        style={{
-          paddingHorizontal: spacing.base,
-          paddingTop: spacing.base,
-          paddingBottom: spacing.sm,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-        }}
+      <ScrollView
+        stickyHeaderIndices={[0]}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: spacing.base }}
       >
-        <View style={{ flex: 1 }}>
-          <Headline>{t('rhythm.title')}</Headline>
-          <Footnote color="secondary" style={{ marginTop: 2 }}>
-            {rangeLabel}
-          </Footnote>
+        <View
+          collapsable={false}
+          style={{
+            backgroundColor: colors.systemGroupedBackground,
+            paddingHorizontal: spacing.base,
+            paddingTop: spacing.base,
+            paddingBottom: spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Headline>{t('rhythm.title')}</Headline>
+            <Footnote color="secondary" style={{ marginTop: 2 }}>
+              {rangeLabel}
+            </Footnote>
+          </View>
+          <IconButton icon={Icons.X} label={t('rhythm.close')} onPress={() => router.back()} />
         </View>
-        <IconButton icon={Icons.X} label={t('rhythm.close')} onPress={() => router.back()} />
-      </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.base, paddingTop: spacing.sm, gap: spacing.base }}>
-        {events.length === 0 ? (
-          <EmptyState icon={Icons.Waves} title={t('rhythm.noRhythmTitle')} body={t('rhythm.noRhythmBody')} />
-        ) : (
-          <>
-            <Card background="grouped">
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Caption1 color="secondary" style={{ fontWeight: '700', textTransform: 'uppercase' }}>
-                    {t('rhythm.averageInterval')}
-                  </Caption1>
-                  <Title2 style={{ marginTop: spacing.xs, fontVariant: ['tabular-nums'] }}>
-                    {formatShortDuration(summary.averageIntervalSeconds, { t, locale })}
-                  </Title2>
+        <View style={{ padding: spacing.base, paddingTop: spacing.sm, gap: spacing.base }}>
+          {events.length === 0 ? (
+            <EmptyState icon={Icons.Waves} title={t('rhythm.noRhythmTitle')} body={t('rhythm.noRhythmBody')} />
+          ) : (
+            <>
+              <Card background="grouped">
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+                  <View style={{ flex: 1 }}>
+                    <Caption1 color="secondary" style={{ fontWeight: '700', textTransform: 'uppercase' }}>
+                      {t('rhythm.averageInterval')}
+                    </Caption1>
+                    <Title2 style={{ marginTop: spacing.xs, fontVariant: ['tabular-nums'] }}>
+                      {formatShortDuration(summary.averageIntervalSeconds, { t, locale })}
+                    </Title2>
+                  </View>
+                  <View
+                    style={{
+                      borderRadius: radii.pill,
+                      backgroundColor: colors.tertiarySystemFill,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 5,
+                    }}
+                  >
+                    <Caption1 style={{ color: colors.secondaryLabel, fontWeight: '700' }}>{status}</Caption1>
+                  </View>
                 </View>
-                <View
-                  style={{
-                    borderRadius: radii.pill,
-                    backgroundColor: colors.tertiarySystemFill,
-                    paddingHorizontal: spacing.sm,
-                    paddingVertical: 5,
-                  }}
-                >
-                  <Caption1 style={{ color: colors.secondaryLabel, fontWeight: '700' }}>{status}</Caption1>
+                <Footnote color="secondary" style={{ marginTop: spacing.base }}>
+                  {summary.eventCount} {t('time.contraction', { count: summary.eventCount })}
+                </Footnote>
+                <View style={{ marginTop: spacing.base }}>
+                  <ContractionRhythmChart
+                    events={events}
+                    now={rangeEndAt}
+                    rangeStartAt={rangeStartAt}
+                    rangeEndAt={rangeEndAt}
+                  />
                 </View>
-              </View>
-              <Footnote color="secondary" style={{ marginTop: spacing.base }}>
-                {summary.eventCount} {t('time.contraction', { count: summary.eventCount })}
-              </Footnote>
-              <View style={{ marginTop: spacing.base }}>
-                <ContractionRhythmChart
-                  events={events}
-                  now={rangeEndAt}
-                  rangeStartAt={rangeStartAt}
-                  rangeEndAt={rangeEndAt}
-                />
-              </View>
-            </Card>
+              </Card>
 
-            <RhythmDetailPanel insight={insight} />
-          </>
-        )}
+              <RhythmDetailPanel insight={insight} />
+            </>
+          )}
+        </View>
       </ScrollView>
     </Sheet>
   );
