@@ -124,6 +124,7 @@ export class AppRepository implements AppRepositoryContract {
     const allEvents = await this.getAllEvents();
     const allUrgentEvents = await this.getAllUrgentEvents();
     return {
+      evaluatedAt: at,
       profile,
       providerRule,
       activeSession,

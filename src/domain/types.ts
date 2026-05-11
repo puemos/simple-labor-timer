@@ -155,6 +155,7 @@ export type SessionSummary = {
 };
 
 export type AppSnapshot = {
+  evaluatedAt: string;
   profile: PregnancyProfile;
   providerRule?: ProviderRule;
   activeSession?: ContractionSession;

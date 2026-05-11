@@ -46,7 +46,7 @@ export class MemoryRepository implements AppRepositoryContract {
 
   async loadSnapshot(at = nowIso()): Promise<AppSnapshot> {
     this.closeStaleActiveSession(at);
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async startContraction(at = nowIso()): Promise<AppSnapshot> {
@@ -63,7 +63,7 @@ export class MemoryRepository implements AppRepositoryContract {
         updatedAt: at,
       });
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async endContraction(at = nowIso()): Promise<AppSnapshot> {
@@ -75,7 +75,7 @@ export class MemoryRepository implements AppRepositoryContract {
       active.endAt = parseIso(at) < parseIso(active.startAt) ? active.startAt : at;
       active.updatedAt = at;
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async undoLastAction(at = nowIso()): Promise<AppSnapshot> {
@@ -90,7 +90,7 @@ export class MemoryRepository implements AppRepositoryContract {
       latest.updatedAt = at;
       latest.manuallyEdited = true;
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async deleteEvent(eventId: string, at = nowIso()): Promise<AppSnapshot> {
@@ -100,7 +100,7 @@ export class MemoryRepository implements AppRepositoryContract {
       event.updatedAt = at;
       event.manuallyEdited = true;
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async restoreLatestDeleted(at = nowIso()): Promise<AppSnapshot> {
@@ -112,7 +112,7 @@ export class MemoryRepository implements AppRepositoryContract {
       latest.updatedAt = at;
       latest.manuallyEdited = true;
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async updateEvent(eventId: string, patch: Partial<Pick<ContractionEvent, 'startAt' | 'endAt' | 'intensity' | 'note'>>, at = nowIso()): Promise<AppSnapshot> {
@@ -123,7 +123,7 @@ export class MemoryRepository implements AppRepositoryContract {
         event.endAt = event.startAt;
       }
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async addMissedEvent(startAt: string, endAt: string, at = nowIso()): Promise<AppSnapshot> {
@@ -139,7 +139,7 @@ export class MemoryRepository implements AppRepositoryContract {
       createdAt: at,
       updatedAt: at,
     });
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async splitEvent(eventId: string, at = nowIso()): Promise<AppSnapshot> {
@@ -164,7 +164,7 @@ export class MemoryRepository implements AppRepositoryContract {
       event.updatedAt = at;
       this.events.push(second);
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async mergeWithPrevious(eventId: string, at = nowIso()): Promise<AppSnapshot> {
@@ -184,7 +184,7 @@ export class MemoryRepository implements AppRepositoryContract {
       current.manuallyEdited = true;
       current.updatedAt = at;
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async recordUrgent(type: UrgentType, note?: string, consentToRecord = true, at = nowIso()): Promise<AppSnapshot> {
@@ -203,17 +203,17 @@ export class MemoryRepository implements AppRepositoryContract {
         createdAt: at,
       });
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async saveProfile(patch: Partial<PregnancyProfile>, at = nowIso()): Promise<AppSnapshot> {
     this.profile = { ...this.profile, ...patch, updatedAt: at };
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async saveProviderRule(patch: Partial<ProviderRule>, at = nowIso()): Promise<AppSnapshot> {
     this.providerRule = { ...this.providerRule, ...patch, updatedAt: at };
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   async closeSession(at = nowIso()): Promise<AppSnapshot> {
@@ -221,14 +221,14 @@ export class MemoryRepository implements AppRepositoryContract {
     if (session) {
       Object.assign(session, { status: 'closed' as const, endedAt: at, updatedAt: at });
     }
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
-  async deleteAllData(): Promise<AppSnapshot> {
+  async deleteAllData(at = nowIso()): Promise<AppSnapshot> {
     this.sessions = [];
     this.events = [];
     this.urgentEvents = [];
-    return this.snapshot();
+    return this.snapshot(at);
   }
 
   private ensureSession(startedAt: string): ContractionSession {
@@ -270,13 +270,14 @@ export class MemoryRepository implements AppRepositoryContract {
     return this.sessions.find((session) => session.status === 'active');
   }
 
-  private snapshot(): AppSnapshot {
+  private snapshot(evaluatedAt: string): AppSnapshot {
     const activeSession = this.getActiveSession();
     const sessions = [...this.sessions].sort((a, b) => parseIso(b.startedAt) - parseIso(a.startedAt));
     const latestSession = sessions[0];
     const allEvents = [...this.events].sort((a, b) => parseIso(a.startAt) - parseIso(b.startAt));
     const allUrgentEvents = [...this.urgentEvents].sort((a, b) => parseIso(b.occurredAt) - parseIso(a.occurredAt));
     return {
+      evaluatedAt,
       profile: { ...this.profile },
       providerRule: { ...this.providerRule },
       activeSession: activeSession ? { ...activeSession } : undefined,

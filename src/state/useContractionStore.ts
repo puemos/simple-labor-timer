@@ -4,12 +4,14 @@ import { useShallow } from 'zustand/react/shallow';
 import { buildSummaryText } from '@/domain/export/summaryText';
 import { evaluateProviderRule } from '@/domain/rules/providerRule';
 import { evaluateUrgentRules } from '@/domain/rules/urgentRules';
+import { shouldStartNewSessionAfterGap } from '@/domain/timing/sessionGrouping';
 import { computeSessionSummary } from '@/domain/timing/summaries';
-import { nowIso } from '@/domain/timing/timeMath';
+import { endedEvents } from '@/domain/timing/timeMath';
 import { AppSnapshot, ContractionEvent, PregnancyProfile, ProviderRule, UrgentType } from '@/domain/types';
 import { getAppRepository } from '@/data/db';
 import { useAppLanguage, useAppTranslation } from '@/i18n';
 import { hapticEnd, hapticStart, hapticWarning } from '@/native/haptics';
+import { useClock } from '@/state/useClock';
 
 type EventPatch = Partial<Pick<ContractionEvent, 'startAt' | 'endAt' | 'intensity' | 'note'>>;
 type AppErrorKey = 'errors.generic' | 'errors.databaseOpen' | 'errors.databaseRefresh';
@@ -19,11 +21,9 @@ type ContractionState = {
   busy: boolean;
   error?: string;
   errorKey?: AppErrorKey;
-  now: string;
   snapshot?: AppSnapshot;
   hydrate: () => Promise<void>;
   refresh: () => Promise<void>;
-  tick: () => void;
   start: () => Promise<void>;
   end: () => Promise<void>;
   undo: () => Promise<void>;
@@ -47,11 +47,10 @@ async function runRepositoryAction(
   set({ busy: true, error: undefined, errorKey: undefined });
   try {
     const snapshot = await action();
-    set({ snapshot, busy: false, now: nowIso() });
+    set({ snapshot, busy: false });
   } catch (caught) {
     set({
       busy: false,
-      now: nowIso(),
       error: caught instanceof Error ? caught.message : undefined,
       errorKey: caught instanceof Error ? undefined : 'errors.generic',
     });
@@ -61,16 +60,14 @@ async function runRepositoryAction(
 export const useContractionStore = create<ContractionState>((set) => ({
   loading: true,
   busy: false,
-  now: nowIso(),
   hydrate: async () => {
     set({ loading: true, error: undefined, errorKey: undefined });
     try {
       const repo = await getAppRepository();
-      set({ snapshot: await repo.loadSnapshot(), loading: false, now: nowIso() });
+      set({ snapshot: await repo.loadSnapshot(), loading: false });
     } catch (caught) {
       set({
         loading: false,
-        now: nowIso(),
         error: caught instanceof Error ? caught.message : undefined,
         errorKey: caught instanceof Error ? undefined : 'errors.databaseOpen',
       });
@@ -79,16 +76,14 @@ export const useContractionStore = create<ContractionState>((set) => ({
   refresh: async () => {
     try {
       const repo = await getAppRepository();
-      set({ snapshot: await repo.loadSnapshot(), error: undefined, errorKey: undefined, now: nowIso() });
+      set({ snapshot: await repo.loadSnapshot(), error: undefined, errorKey: undefined });
     } catch (caught) {
       set({
-        now: nowIso(),
         error: caught instanceof Error ? caught.message : undefined,
         errorKey: caught instanceof Error ? undefined : 'errors.databaseRefresh',
       });
     }
   },
-  tick: () => set({ now: nowIso() }),
   start: async () => {
     await hapticStart();
     await runRepositoryAction(set, async () => (await getAppRepository()).startContraction());
@@ -114,16 +109,10 @@ export const useContractionStore = create<ContractionState>((set) => ({
 
 export function useContractionBootstrap() {
   const hydrate = useContractionStore((state) => state.hydrate);
-  const tick = useContractionStore((state) => state.tick);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
-
-  useEffect(() => {
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [tick]);
 }
 
 export function useContractionApp() {
@@ -134,9 +123,9 @@ export function useContractionApp() {
   const rawError = useContractionStore((state) => state.error);
   const errorKey = useContractionStore((state) => state.errorKey);
   const error = rawError ?? (errorKey ? t(errorKey) : undefined);
-  const now = useContractionStore((state) => state.now);
   const snapshot = useContractionStore((state) => state.snapshot);
   const activeSessionId = snapshot?.activeSession?.id;
+  const hasActiveSession = Boolean(activeSessionId);
   const refresh = useContractionStore((state) => state.refresh);
   const actions = useContractionStore(
     useShallow((state) => ({
@@ -158,17 +147,23 @@ export function useContractionApp() {
     })),
   );
 
+  const now = useClock(hasActiveSession);
+  const evaluatedAt = snapshot?.evaluatedAt ?? now;
+
   const summary = useMemo(
-    () => computeSessionSummary(snapshot?.events ?? [], now, snapshot?.activeSession),
-    [now, snapshot?.activeSession, snapshot?.events],
+    () => computeSessionSummary(snapshot?.events ?? [], evaluatedAt, snapshot?.activeSession),
+    [evaluatedAt, snapshot?.activeSession, snapshot?.events],
   );
   const providerRuleResult = useMemo(
-    () => evaluateProviderRule(snapshot?.events ?? [], snapshot?.providerRule, now, { t, locale }),
-    [locale, now, snapshot?.events, snapshot?.providerRule, t],
+    () => evaluateProviderRule(snapshot?.events ?? [], snapshot?.providerRule, evaluatedAt, { t, locale }),
+    [evaluatedAt, locale, snapshot?.events, snapshot?.providerRule, t],
   );
   const urgentRuleResult = useMemo(
-    () => (snapshot ? evaluateUrgentRules(snapshot.events, snapshot.profile, now, { t, locale }) : { active: false, sourceIds: [] as string[] }),
-    [locale, now, snapshot, t],
+    () =>
+      snapshot
+        ? evaluateUrgentRules(snapshot.events, snapshot.profile, evaluatedAt, { t, locale })
+        : { active: false, sourceIds: [] as string[] },
+    [evaluatedAt, locale, snapshot, t],
   );
 
   useEffect(() => {
@@ -177,11 +172,18 @@ export function useContractionApp() {
     }
   }, [urgentRuleResult.active, urgentRuleResult.type]);
 
+  const shouldAutoClose = useMemo(() => {
+    if (!snapshot?.activeSession) {
+      return false;
+    }
+    return shouldStartNewSessionAfterGap(endedEvents(snapshot.events).at(-1), now);
+  }, [now, snapshot?.activeSession, snapshot?.events]);
+
   useEffect(() => {
-    if (!busy && activeSessionId && summary.timerState === 'idle') {
+    if (!busy && shouldAutoClose) {
       void refresh();
     }
-  }, [activeSessionId, busy, refresh, summary.timerState]);
+  }, [busy, refresh, shouldAutoClose]);
 
   const readAloudSummary = useMemo(() => {
     if (!snapshot) {
@@ -193,7 +195,7 @@ export function useContractionApp() {
       events: snapshot.events,
       urgentEvents: snapshot.urgentEvents,
       providerRuleResult,
-      now,
+      now: evaluatedAt,
       rangeLabel: t('time.currentSession'),
       appVersion: '1.0.0',
       includeNotes: true,
@@ -201,7 +203,7 @@ export function useContractionApp() {
       locale,
       t,
     });
-  }, [locale, now, providerRuleResult, snapshot, t]);
+  }, [evaluatedAt, locale, providerRuleResult, snapshot, t]);
 
   return {
     loading,
@@ -216,3 +218,4 @@ export function useContractionApp() {
     readAloudSummary,
   };
 }
+
