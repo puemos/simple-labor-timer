@@ -79,8 +79,8 @@ export const lightColors: Palette = {
   systemGray: '#8E8E93',
 
   accent: '#007AFF',
-  contractionActive: '#0F766E',
-  contractionActiveSubtle: 'rgba(15, 118, 110, 0.10)',
+  contractionActive: '#C0265E',
+  contractionActiveSubtle: 'rgba(192, 38, 94, 0.10)',
   urgent: '#FF3B30',
   success: '#34C759',
   warning: '#FF9500',
@@ -126,15 +126,15 @@ export const darkColors: Palette = {
   systemGray: '#8E8E93',
 
   accent: '#0A84FF',
-  contractionActive: '#14B8A6',
-  contractionActiveSubtle: 'rgba(20, 184, 166, 0.20)',
+  contractionActive: '#F472B6',
+  contractionActiveSubtle: 'rgba(244, 114, 182, 0.20)',
   urgent: '#FF453A',
   success: '#30D158',
   warning: '#FF9F0A',
   ruleMet: '#30D158',
 
   onAccent: '#FFFFFF',
-  onContractionActive: '#001F1C',
+  onContractionActive: '#2A0614',
   onUrgent: '#FFFFFF',
   onSuccess: '#FFFFFF',
 };
