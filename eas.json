@@ -27,7 +27,7 @@
       },
       "ios": {
         "bundleIdentifier": "app.simplelabortimer",
-        "ascAppId": "0000000000",
+        "ascAppId": "6768247052",
         "sku": "app.simplelabortimer",
         "metadataPath": "./store.config.json"
       }
