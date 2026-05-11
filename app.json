@@ -18,7 +18,23 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.simplelabortimer"
+      "bundleIdentifier": "app.simplelabortimer",
+      "infoPlist": {
+        "ExpoLocalization_supportsRTL": true,
+        "CFBundleLocalizations": [
+          "en",
+          "it",
+          "fr",
+          "es",
+          "de",
+          "pt-BR",
+          "zh-Hans",
+          "ja",
+          "ko",
+          "ar",
+          "hi"
+        ]
+      }
     },
     "android": {
       "package": "app.simplelabortimer",
@@ -98,10 +114,15 @@
       ]
     ],
     "extra": {
-      "supportsRTL": true
+      "supportsRTL": true,
+      "router": {},
+      "eas": {
+        "projectId": "d5cc01fb-e871-4f78-b444-da32c18414c5"
+      }
     },
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "puemos"
   }
 }
