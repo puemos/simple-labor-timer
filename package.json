@@ -19,6 +19,7 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
+    "screenshots:ios": "tsx scripts/generate-ios-screenshots.ts",
     "lint": "expo lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

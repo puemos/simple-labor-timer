@@ -49,6 +49,7 @@ function RootShell() {
             options={{
               presentation: 'formSheet',
               sheetAllowedDetents: [0.5, 1.0],
+              sheetInitialDetentIndex: 1,
               sheetGrabberVisible: true,
               animation: 'slide_from_bottom',
             }}
