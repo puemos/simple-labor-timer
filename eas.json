@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": "18.11.0",
+    "requireCommit": true,
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "node": "22.21.1",
+      "pnpm": "10.24.0",
+      "corepack": true,
+      "distribution": "store",
+      "credentialsSource": "remote",
+      "environment": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "applicationId": "app.simplelabortimer",
+        "track": "internal",
+        "releaseStatus": "completed"
+      },
+      "ios": {
+        "bundleIdentifier": "app.simplelabortimer",
+        "ascAppId": "0000000000",
+        "sku": "app.simplelabortimer",
+        "metadataPath": "./store.config.json"
+      }
+    }
+  }
+}

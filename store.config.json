@@ -1,0 +1,17 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Puemos",
+    "info": {
+      "en-US": {
+        "title": "Simple Labor Timer",
+        "subtitle": "Free, private labor timer",
+        "description": "Simple Labor Timer is a local-first timer for recording contraction duration, rhythm, care-team call rules, and urgent warning signs. Data stays on device unless you choose to share an export. The app has no account, backend, analytics, ads, subscriptions, or paid unlocks.",
+        "keywords": ["contraction", "timer", "pregnancy", "labor", "birth", "midwife", "doula"],
+        "marketingUrl": "https://puemos.github.io/simple-labor-timer/",
+        "supportUrl": "https://puemos.github.io/simple-labor-timer/support/",
+        "privacyPolicyUrl": "https://puemos.github.io/simple-labor-timer/privacy/"
+      }
+    }
+  }
+}

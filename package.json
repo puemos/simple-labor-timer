@@ -13,7 +13,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test",
+    "release:verify": "pnpm exec expo install --check && pnpm run verify",
+    "release:metadata:ios": "eas metadata:push",
+    "release:build": "eas build --platform all --profile production",
+    "release:submit:android": "eas submit --platform android --profile production",
+    "release:submit:ios": "eas submit --platform ios --profile production"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -52,6 +57,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",
+    "eas-cli": "^18.11.0",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~10.0.0",
     "tsx": "^4.21.0",

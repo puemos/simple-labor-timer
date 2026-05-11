@@ -1,5 +1,3 @@
 {
-  "CFBundleDisplayName": "宫缩计时器",
-  "NSFaceIDUsageDescription": "允许宫缩计时器访问你的 Face ID 生物识别数据。",
-  "NSMicrophoneUsageDescription": ""
+  "CFBundleDisplayName": "宫缩计时器"
 }

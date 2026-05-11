@@ -1,5 +1,3 @@
 {
-  "CFBundleDisplayName": "Timer contrazioni",
-  "NSFaceIDUsageDescription": "Consenti a Timer contrazioni di accedere ai dati biometrici di Face ID.",
-  "NSMicrophoneUsageDescription": ""
+  "CFBundleDisplayName": "Timer contrazioni"
 }

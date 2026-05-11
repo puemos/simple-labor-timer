@@ -14,6 +14,10 @@ yarn-error.log*
 *.db
 *.sqlite
 *.sqlite3
+*.p8
+credentials.json
+google-service-account*.json
+service-account*.json
 ios/
 android/
 

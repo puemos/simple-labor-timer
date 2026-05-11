@@ -1,5 +1,3 @@
 {
-  "CFBundleDisplayName": "陣痛タイマー",
-  "NSFaceIDUsageDescription": "陣痛タイマーがFace IDの生体認証データにアクセスすることを許可します。",
-  "NSMicrophoneUsageDescription": ""
+  "CFBundleDisplayName": "陣痛タイマー"
 }
