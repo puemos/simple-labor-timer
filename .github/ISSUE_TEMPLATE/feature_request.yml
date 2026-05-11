@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest a focused improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Do not include private medical information, phone numbers, names, notes, screenshots with personal data, or contraction logs.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user need should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should change?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact areas
+      options:
+        - label: User privacy
+        - label: Medical-adjacent copy or timing rules
+        - label: Translations
+        - label: Native dependencies
+        - label: Store listing or release process

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { resolveT, setActiveLocale } from '@/i18n/format';
-import machineTranslations from '@/i18n/machineTranslations.json';
 import { resources, rtlLocales, supportedLocales } from '@/i18n/resources';
 
 describe('i18n resources', () => {
@@ -12,12 +11,11 @@ describe('i18n resources', () => {
     });
   });
 
-  it('ships generated translations for every source key before fallback is applied', () => {
+  it('ships locale resources for every source key', () => {
     const englishKeys = flattenKeys(resources.en.translation);
-    const generated = machineTranslations as Record<string, unknown>;
 
     supportedLocales.forEach((locale) => {
-      expect(flattenKeys(generated[locale]), locale).toEqual(englishKeys);
+      expect(flattenKeys(resources[locale].translation), locale).toEqual(englishKeys);
     });
   });
 

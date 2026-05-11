@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Medical or urgent concern
+    url: https://puemos.github.io/simple-labor-timer/support/
+    about: This project cannot help with medical or urgent concerns. Contact your care team or local emergency services.

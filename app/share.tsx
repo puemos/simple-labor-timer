@@ -1,5 +1,5 @@
 import * as Print from 'expo-print';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, Share, Switch, View } from 'react-native';
@@ -39,6 +39,7 @@ const formats: { key: ShareFormat; labelKey: string; color: string }[] = [
 ];
 
 export default function ShareRoute() {
+  const { preview: previewParam } = useLocalSearchParams<{ preview?: string }>();
   const { t } = useAppTranslation();
   const { locale } = useAppLanguage();
   const { colors, spacing } = useTheme();
@@ -48,7 +49,7 @@ export default function ShareRoute() {
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeUrgent, setIncludeUrgent] = useState(true);
   const [sharing, setSharing] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(previewParam === '1');
   const selectedSession = snapshot?.activeSession ?? snapshot?.latestSession;
   const exportNow = range === 'session' && selectedSession?.endedAt ? selectedSession.endedAt : now;
 
