@@ -1,0 +1,52 @@
+body {
+  margin: 0;
+  padding: 0;
+  color: #1a1a1a;
+  background: #fff;
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 70ch;
+  margin: 2em auto;
+  padding: 0 1em;
+}
+
+h1 {
+  margin: 0 0 0.2em;
+  font-size: 2em;
+  line-height: 1.15;
+}
+
+h2 {
+  margin-top: 2em;
+  line-height: 1.25;
+}
+
+p {
+  margin: 1em 0;
+}
+
+a {
+  color: #0055aa;
+}
+
+.site-nav {
+  margin-bottom: 2em;
+}
+
+.site-nav a {
+  margin-right: 1em;
+}
+
+.tagline {
+  margin-top: 0;
+  color: #555;
+  font-size: 1.15em;
+}
+
+.updated {
+  margin-top: 0;
+  color: #555;
+}

@@ -4,67 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Simple Labor Timer</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        line-height: 1.5;
-      }
-
-      body {
-        margin: 0;
-        color: #172026;
-        background: #f8faf9;
-      }
-
-      main {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 48px 20px;
-      }
-
-      h1 {
-        margin: 0 0 12px;
-        font-size: clamp(2rem, 8vw, 3.5rem);
-        line-height: 1;
-      }
-
-      p {
-        max-width: 640px;
-      }
-
-      a {
-        color: #0b6f66;
-      }
-
-      nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin-top: 32px;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        body {
-          color: #edf4f2;
-          background: #071019;
-        }
-
-        a {
-          color: #73d6c7;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main>
       <h1>Simple Labor Timer</h1>
+      <p class="tagline">Free, private labor timer.</p>
       <p>
         A free, private contraction timer for recording contraction duration, rhythm,
         care-team call rules, and urgent warning signs. Data stays on device unless
         you choose to share an export.
       </p>
-      <nav aria-label="Legal and support">
+      <nav class="site-nav" aria-label="Legal and support">
         <a href="./privacy/">Privacy Policy</a>
         <a href="./support/">Support</a>
       </nav>
