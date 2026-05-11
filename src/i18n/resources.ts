@@ -1,3 +1,5 @@
+import machineTranslations from '@/i18n/machineTranslations.json';
+
 export const supportedLocales = ['en', 'it', 'fr', 'es', 'de', 'pt-BR', 'zh-Hans', 'ja', 'ko', 'ar', 'hi'] as const;
 
 export type SupportedLocale = (typeof supportedLocales)[number];
@@ -43,6 +45,11 @@ export const en = {
     dark: 'Dark',
     custom: 'Custom',
     pdf: 'PDF',
+  },
+  errors: {
+    generic: 'Something went wrong.',
+    databaseOpen: 'The local database could not be opened.',
+    databaseRefresh: 'The local database could not be refreshed.',
   },
   language: {
     title: 'Language',
@@ -169,6 +176,28 @@ export const en = {
     callCareTeamAction: 'Call your care team',
     mockData: 'Mock data',
     mockDataFooter: 'Development only. Loading a scenario replaces local sessions, contractions, urgent events, and profile/rule defaults.',
+    mockScenarios: {
+      early_data: {
+        name: 'Early data',
+        description: 'One timed contraction so rhythm still needs more data.',
+      },
+      regular_5_1_1: {
+        name: 'Regular 5-1-1',
+        description: 'One-minute contractions every five minutes for the saved call rule.',
+      },
+      getting_closer: {
+        name: 'Getting closer',
+        description: 'Intervals tighten over the session without meeting the call rule yet.',
+      },
+      spacing_out: {
+        name: 'Spacing out',
+        description: 'Intervals spread farther apart so the rhythm reads as spacing out.',
+      },
+      active_over_2_min: {
+        name: 'Active over 2 min',
+        description: 'An active contraction has passed two minutes for urgent-warning testing.',
+      },
+    },
     loadMockTitle: 'Load mock data?',
     loadMockBody: 'This replaces local app data with the "{{name}}" scenario.',
     mockFailedTitle: 'Mock data failed',
@@ -482,7 +511,15 @@ export const partialResources = {
 } satisfies Record<SupportedLocale, PartialDeep<TranslationResource>>;
 
 export const resources = Object.fromEntries(
-  supportedLocales.map((locale) => [locale, { translation: mergeDeep(en, partialResources[locale]) }]),
+  supportedLocales.map((locale) => [
+    locale,
+    {
+      translation: mergeDeep(
+        mergeDeep(en, (machineTranslations as Record<SupportedLocale, PartialDeep<TranslationResource>>)[locale] ?? {}),
+        partialResources[locale],
+      ),
+    },
+  ]),
 ) as Record<SupportedLocale, { translation: TranslationResource }>;
 
 type PartialDeep<T> = {
