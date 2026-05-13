@@ -20,6 +20,13 @@ pnpm exec eas credentials --platform android
 ## Before The First Release
 
 - Create the App Store Connect app record for `app.simplelabortimer`, then set `submit.production.ios.ascAppId` in `eas.json` to the Apple ID from App Information.
+- Keep the first iOS release iPhone-only. `ios.supportsTablet` and `TARGETED_DEVICE_FAMILY` should not include iPad until iPad screenshots and layout QA are ready.
+- In App Store Connect, complete the fields that EAS Metadata does not cover:
+  - Set Content Rights to indicate the app does not contain or access third-party content.
+  - Set App Privacy to no data collected.
+  - Set Regulated Medical Devices to No.
+  - Set pricing to free and keep the version release option as manual release.
+  - Exclude France from v1 availability unless a French encryption declaration is prepared for SQLCipher.
 - Create the Google Play Console app for `app.simplelabortimer`, set pricing to free, complete Data Safety and privacy policy forms, and manually upload the first Android App Bundle because the Play API cannot do the first upload.
 - Upload the Google service account key to EAS credentials after the first Play upload. Keep `.p8`, service-account JSON, and `credentials.json` files out of git.
 - Enable GitHub Pages through GitHub Actions so these store URLs resolve:
@@ -44,7 +51,9 @@ Generate iOS App Store screenshots locally before uploading metadata. The defaul
 pnpm run screenshots:ios -- --target iphone-6.5
 ```
 
-Upload the PNGs from `metadata/screenshots/en-US/ios/iphone-6.5/promo` to the iPhone 6.5" screenshot slot. Use `--target iphone-6.9` only when preparing screenshots for the separate 6.9" slot.
+Upload the PNGs from `metadata/screenshots/en-US/ios/iphone-6.9/promo` to the iPhone 6.9" screenshot slot. The 6.5" screenshots in `metadata/screenshots/en-US/ios/iphone-6.5/promo` can be uploaded as optional coverage.
+
+When answering App Store Connect encryption questions, this app uses SQLCipher through `expo-sqlite`. For v1, keep France unavailable unless the French encryption declaration is uploaded and accepted.
 
 To publish after account setup is complete:
 

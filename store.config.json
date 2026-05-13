@@ -1,17 +1,23 @@
 {
   "configVersion": 0,
   "apple": {
-    "copyright": "2026 Puemos",
+    "version": "1.0",
+    "copyright": "2026 Shy Alter",
+    "categories": ["HEALTH_AND_FITNESS"],
     "info": {
       "en-US": {
         "title": "Simple Labor Timer",
         "subtitle": "Free, private labor timer",
-        "description": "Simple Labor Timer is a local-first timer for recording contraction duration, rhythm, care-team call rules, and urgent warning signs. Data stays on device unless you choose to share an export. The app has no account, backend, analytics, ads, subscriptions, or paid unlocks.",
+        "promoText": "Private contraction timing, editable history, rhythm summaries, urgent warning signs, and shareable care-team updates with no ads or accounts.",
+        "description": "Simple Labor Timer is a free, private contraction timer built for calm use during labor.\n\nTrack contraction start and end times with one large control, then review duration, frequency, rhythm, and trend as the session changes. Add notes and intensity, edit missed or incorrect records, and keep care-team call rules close at hand.\n\nFeatures:\n- One-tap contraction timing with haptics\n- Session history with editable records\n- Average duration and start-to-start rhythm summaries\n- Care-team call rule status\n- Urgent warning sign logging\n- Local text and PDF exports for sharing\n- Multilingual interface with right-to-left support\n- No account, ads, analytics, subscriptions, or backend\n\nYour data stays on your device unless you choose to share an export through your device's share sheet.\n\nSimple Labor Timer is not a medical device and does not provide medical advice, diagnosis, treatment, labor confirmation, fetal monitoring, or birth-setting recommendations. Contact your care team or emergency services for medical concerns.",
         "keywords": ["contraction", "timer", "pregnancy", "labor", "birth", "midwife", "doula"],
         "marketingUrl": "https://puemos.github.io/simple-labor-timer/",
         "supportUrl": "https://puemos.github.io/simple-labor-timer/support/",
         "privacyPolicyUrl": "https://puemos.github.io/simple-labor-timer/privacy/"
       }
+    },
+    "release": {
+      "automaticRelease": false
     }
   }
 }

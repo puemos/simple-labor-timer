@@ -3,7 +3,7 @@
     "name": "Simple Labor Timer",
     "slug": "simple-labor-timer",
     "scheme": "simplelabortimer",
-    "version": "1.0.0",
+    "version": "1.0",
     "icon": "./assets/icons/ios-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -20,7 +20,7 @@
         "dark": "./assets/icons/ios-icon.png",
         "tinted": "./assets/icons/ios-icon.png"
       },
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "app.simplelabortimer",
       "infoPlist": {
         "CFBundleName": "Simple Labor Timer",
