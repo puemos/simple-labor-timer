@@ -4,6 +4,16 @@ Simple Labor Timer is a free, local-first contraction timer for iOS and Android.
 
 The app is built for privacy and calm use during labor. It has no account, backend, analytics, tracking, ads, subscriptions, or paid unlock path.
 
+## Screenshots
+
+<p align="center">
+  <img src="metadata/screenshots/en-US/ios/iphone-6.9/promo/01-one-tap-timer.png" alt="One-tap contraction timer" width="160">
+  <img src="metadata/screenshots/en-US/ios/iphone-6.9/promo/02-rhythm-at-a-glance.png" alt="Rhythm summary" width="160">
+  <img src="metadata/screenshots/en-US/ios/iphone-6.9/promo/03-call-rule-match.png" alt="Care-team call rule match" width="160">
+  <img src="metadata/screenshots/en-US/ios/iphone-6.9/promo/04-review-history.png" alt="Session history review" width="160">
+  <img src="metadata/screenshots/en-US/ios/iphone-6.9/promo/05-private-share.png" alt="Private care-team share export" width="160">
+</p>
+
 ## Safety And Privacy
 
 - This app is not a medical device and does not provide medical advice, diagnosis, treatment, labor confirmation, fetal monitoring, or birth-setting recommendations.
