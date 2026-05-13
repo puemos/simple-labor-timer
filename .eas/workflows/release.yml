@@ -9,8 +9,6 @@ on:
 defaults:
   tools:
     node: 22.21.1
-    pnpm: 10.16.1
-    corepack: true
 
 jobs:
   verify:
