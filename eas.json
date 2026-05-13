@@ -7,7 +7,7 @@
   "build": {
     "development": {
       "node": "22.21.1",
-      "pnpm": "10.24.0",
+      "pnpm": "10.16.1",
       "corepack": true,
       "developmentClient": true,
       "distribution": "internal",
@@ -16,7 +16,7 @@
     },
     "production": {
       "node": "22.21.1",
-      "pnpm": "10.24.0",
+      "pnpm": "10.16.1",
       "corepack": true,
       "distribution": "store",
       "credentialsSource": "remote",
