@@ -36,20 +36,8 @@
           "ja",
           "ko",
           "ar",
-          "hi",
-          "en",
-          "it",
-          "fr",
-          "es",
-          "de",
-          "pt-BR",
-          "zh-Hans",
-          "ja",
-          "ko",
-          "ar",
           "hi"
-        ],
-        "ITSAppUsesNonExemptEncryption": false
+        ]
       }
     },
     "android": {
