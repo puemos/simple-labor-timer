@@ -4,6 +4,7 @@
     "slug": "simple-labor-timer",
     "scheme": "simplelabortimer",
     "version": "1.0.0",
+    "icon": "./assets/icons/ios-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,10 +15,15 @@
       "**/*"
     ],
     "ios": {
-      "icon": "./assets/icons/ios-icon.png",
+      "icon": {
+        "light": "./assets/icons/ios-icon.png",
+        "dark": "./assets/icons/ios-icon.png",
+        "tinted": "./assets/icons/ios-icon.png"
+      },
       "supportsTablet": true,
       "bundleIdentifier": "app.simplelabortimer",
       "infoPlist": {
+        "CFBundleName": "Simple Labor Timer",
         "ExpoLocalization_supportsRTL": true,
         "CFBundleLocalizations": [
           "en",
@@ -37,7 +43,10 @@
     "android": {
       "package": "app.simplelabortimer",
       "permissions": [],
+      "icon": "./assets/icons/android-icon.png",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/android-adaptive-foreground.png",
+        "monochromeImage": "./assets/icons/android-monochrome.png",
         "backgroundColor": "#071019"
       },
       "edgeToEdgeEnabled": true,
